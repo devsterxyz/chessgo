@@ -1,11 +1,14 @@
-import { useState } from 'react'
 import { Route, Routes } from 'react-router-dom'
+
 
 import { Game } from './screens/Game'
 import { Landing } from './screens/Landing'
 
 
-function App() {
+
+
+
+const App = () => {
 
   return (
     <div className="h-screen bg-slate-950">
