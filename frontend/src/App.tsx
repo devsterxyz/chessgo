@@ -1,12 +1,6 @@
 import { Route, Routes } from 'react-router-dom'
-
-
 import { Game } from './screens/Game'
 import { Landing } from './screens/Landing'
-
-
-
-
 
 const App = () => {
 

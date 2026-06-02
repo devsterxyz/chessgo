@@ -22,7 +22,7 @@ export const Landing = () => {
             </div>
           </div>
         </div>
-      </div>
+      </div>f
     </div>
   )
 }
