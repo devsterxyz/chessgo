@@ -8,6 +8,7 @@ export class Game {
   public player2: WebSocket
   public board: Chess
   private startTime: Date
+  private moveCount = 0
 
   constructor(player1: WebSocket, player2: WebSocket){
     this.player1 = player1
@@ -32,22 +33,28 @@ export class Game {
     from: string
     to: string
   }){
-    if(this.board.moves.length % 2 === 0 && socket !== this.player1){
+    console.log(this.moveCount)
+    if(this.moveCount % 2 === 0 && socket !== this.player1){
+      console.log("early return 1")
       return
     }
-    if(this.board.moves.length %2 === 1 && socket !== this.player2){
+    if(this.moveCount%2 === 1 && socket !== this.player2){
+      console.log("early return 2")
       return
     }
+    console.log("did not early return")
     if(socket === this.player1 || socket === this.player2){
       // validate the type of move using zod
       try{ 
         this.board.move(move)
+        
       }
       catch(e){
         console.log(e)
         return
       }
 
+      console.log("move succeeded")
 
       // check is the game is over
 
@@ -68,20 +75,22 @@ export class Game {
         return
       }
 
-      if(this.board.moves.length % 2 === 0){
-        this.player2.emit(JSON.stringify({
+      console.log(this.moveCount % 2)
+      if(this.moveCount % 2 === 0){
+        console.log("sen1")
+        this.player2.send(JSON.stringify({
           type: MOVE,
           payload: move
         }))
       }
       else{
-        this.player1.emit(JSON.stringify({
+        console.log("sen1")
+        this.player1.send(JSON.stringify({
           type: MOVE,
           payload: move
         }))
       }
-
-      // send the updated board to both players
+     this.moveCount++
     }
   }
 }
