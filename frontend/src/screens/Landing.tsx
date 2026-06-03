@@ -1,8 +1,8 @@
 import { useNavigate } from 'react-router-dom'
-import { Button } from '../components/Button'
+import Button from '../components/Button'
 
 
-export const Landing = () => {
+const Landing = () => {
   const navigate = useNavigate()
   return(
     <div className='flex justify-center'>
@@ -22,7 +22,9 @@ export const Landing = () => {
             </div>
           </div>
         </div>
-      </div>f
+      </div>
     </div>
   )
 }
+
+export default Landing;
