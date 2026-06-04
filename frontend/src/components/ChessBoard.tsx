@@ -48,10 +48,10 @@ const ChessBoard = ({ chess, board, socket, setBoard }: {
                   setBoard(chess.board())
                   console.log("Move sent:", {from, to: squareRepresentation})
                 }
-              }} key={j} className={`w-20 h-20 ${(i+j) % 2 === 0 ? 'bg-[#7A9CB1]' : 'bg-[#D9E4E8]'}`}>
+              }} key={j} className={`w-20 h-20 ${(i+j) % 2 === 0 ? 'bg-[#D9E4E8]' : 'bg-[#7A9CB1]'}`}>
                 <div className="w-full justify-center flex h-full">
                   <div className="h-full justify-center flex flex-col">
-                    {square? <img className="w-16" src={`/${square?.color === "b" ? square?.type : `${square?.type?.toUpperCase()} copy`}.svg`} /> : null}
+                    {square? <img className="w-15" src={`/${square?.color === "b" ? square?.type : `${square?.type?.toUpperCase()} copy`}.svg`} /> : null}
                   </div>
                 </div>
               </div>
