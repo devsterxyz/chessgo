@@ -9,7 +9,12 @@ type BoardSquare = {
 } | null;
 
 
-const ChessBoard = ({ board, socket }: {board: BoardSquare[][]; socket: WebSocket}) => {
+const ChessBoard = ({ chess, board, socket, setBoard }: {
+    board: BoardSquare[][] 
+    socket: WebSocket
+    setBoard: any
+    chess: any
+  }) => {
   const [from, setFrom] = useState<null | Square>(null)
   const [to, setTo] = useState<null | Square>(null)
 
@@ -19,20 +24,26 @@ const ChessBoard = ({ board, socket }: {board: BoardSquare[][]; socket: WebSocke
         return (
           <div key={i} className="flex">
             {row.map((square, j) => {
+              const squareRepresentation = String.fromCharCode(97 + (j % 8)) + "" + (8 - i) as Square
               return <div onClick={()=>{
                 if(!from){
-                  setFrom(square?.square ?? null);
+                  setFrom(squareRepresentation);
                 }
                 else{
-                  setTo( square?.square ?? null);
                   socket.send(JSON.stringify({
                     type: MOVE,
                     payload: {
                       from,
-                      to
+                      to: squareRepresentation
                     }
                   }))
-                  console.log("Move sent:", {from, to})
+                  setFrom(null)
+                  chess.move({
+                    from,
+                    to: squareRepresentation
+                  })
+                  setBoard(chess.board())
+                  console.log("Move sent:", {from, to: squareRepresentation})
                 }
               }} key={j} className={`w-20 h-20 ${(i+j) % 2 === 0 ? 'bg-[#7A9CB1]' : 'bg-[#D9E4E8]'}`}>
                 <div className="w-full justify-center flex h-full">
