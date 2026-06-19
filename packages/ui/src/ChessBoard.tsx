@@ -3,7 +3,7 @@
 import { useRef, useState, useEffect } from "react";
 import { Chess, Square } from "chess.js";
 import { Chessboard } from "react-chessboard";
-import type { ChessboardOptions, PieceDropHandlerArgs, SquareHandlerArgs } from "react-chessboard";
+import type { ChessboardOptions, PieceDropHandlerArgs, SquareHandlerArgs, PieceRenderObject } from "react-chessboard";
 
 // Inline SVG pieces for the promotion dialog
 const PIECE_SVGS: Record<string, string> = {
@@ -21,6 +21,27 @@ interface PromotionState {
   file: string;
   fileIndex: number;
 }
+
+const pieceImageStyle = { width: "100%"};
+
+const createPiece = (piece: string) => () => (
+  <img src={`/${piece}.svg`} alt={piece} style={pieceImageStyle} />
+);
+
+const customPieces: PieceRenderObject = {
+  wP: createPiece("wP"),
+  wN: createPiece("wN"),
+  wB: createPiece("wB"),
+  wR: createPiece("wR"),
+  wQ: createPiece("wQ"),
+  wK: createPiece("wK"),
+  bP: createPiece("bP"),
+  bN: createPiece("bN"),
+  bB: createPiece("bB"),
+  bR: createPiece("bR"),
+  bQ: createPiece("bQ"),
+  bK: createPiece("bK"),
+};
 
 function PromotionDialog({
   promotion,
@@ -122,6 +143,11 @@ export function ChessBoard() {
   >({});
   const [promotion, setPromotion] = useState<PromotionState | null>(null);
   const [squareWidth, setSquareWidth] = useState(0);
+
+  // squares the user has right-clicked to highlight
+  const [highlightedSquares, setHighlightedSquares] = useState<
+    Record<string, React.CSSProperties>
+  >({});
 
   // Measure square width once the board renders
   useEffect(() => {
@@ -266,14 +292,38 @@ export function ChessBoard() {
     }
   }
 
+  // any left click anywhere on the board (including the start of a piece drag) clears highlights
+  function onSquareMouseDown(_args: SquareHandlerArgs, e: React.MouseEvent) {
+    if (e.button !== 0) return; // only the left mouse button
+    setHighlightedSquares((prev) => (Object.keys(prev).length > 0 ? {} : prev));
+  }
+
+  // right-click toggles a highlight color on any square, empty or occupied
+  function onSquareRightClick({ square }: SquareHandlerArgs) {
+    setHighlightedSquares((prev) => {
+      const next = { ...prev };
+      if (next[square]) {
+        // right-clicking an already-highlighted square clears it
+        delete next[square];
+      } else {
+        next[square] = { backgroundColor: "rgba(188, 52, 52, 0.8)" };
+      }
+      return next;
+    });
+  }
+
   const chessboardOptions: ChessboardOptions = {
     id: "chess-board",
     position: chessPosition,
     onSquareClick,
     onPieceDrop,
+    onSquareRightClick,
+    onSquareMouseDown,
     lightSquareStyle: { backgroundColor: "#D9E4E8" },
     darkSquareStyle: { backgroundColor: "#7A9CB1" },
-    squareStyles: optionSquares,
+    pieces: customPieces,
+    // option-move dots take visual priority over a manual highlight on the same square
+    squareStyles: { ...highlightedSquares, ...optionSquares },
   };
 
   return (
