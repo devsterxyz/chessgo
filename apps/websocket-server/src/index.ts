@@ -1,23 +1,14 @@
 import { WebSocketServer } from "ws";
+import { GameManager } from "./GameManager.js";
 
 
 
 const wss = new WebSocketServer({ port: 8080 });
+const gameManager = new GameManager();
 
-wss.on("connection", (socket) => {
-  console.log("Client connected");
-
-  socket.send("Hello from Turborepo WebSocket server");
-
-  socket.on("message", (message) => {
-    console.log("Received:", message.toString());
-
-    socket.send(`Echo: ${message}`);
-  });
-
-  socket.on("close", () => {
-    console.log("Client disconnected");
-  });
-});
+wss.on('connection', function connection(ws){
+  gameManager.addUser(ws)
+  ws.on("disconnect", () => gameManager.removeUser(ws))
+})
 
 console.log("WebSocket server running on ws://localhost:8080");
