@@ -132,7 +132,12 @@ function PromotionDialog({
 
 const FILES = ["a", "b", "c", "d", "e", "f", "g", "h"];
 
-export function ChessBoard() {
+interface ChessBoardProps {
+  position?: string;
+  onMove?: (from: Square, to: Square, promotion?: PromotionPiece) => void;
+}
+
+export function ChessBoard({ position, onMove }: ChessBoardProps) {
   const chessGameRef = useRef(new Chess());
   const chessGame = chessGameRef.current;
 
@@ -143,6 +148,16 @@ export function ChessBoard() {
   >({});
   const [promotion, setPromotion] = useState<PromotionState | null>(null);
   const [squareWidth, setSquareWidth] = useState(0);
+
+  useEffect(() => {
+    if (!position || position === chessPosition) return;
+    try {
+      chessGame.load(position);
+      setChessPosition(position);
+    } catch {
+      // ignore invalid external FEN
+    }
+  }, [position, chessGame, chessPosition]);
 
   // squares the user has right-clicked to highlight
   const [highlightedSquares, setHighlightedSquares] = useState<
@@ -209,6 +224,25 @@ export function ChessBoard() {
 
   function handlePromotionSelect(piece: PromotionPiece) {
     if (!promotion) return;
+
+    if (onMove) {
+      try {
+        const moveResult = chessGame.move({
+          from: promotion.sourceSquare,
+          to: promotion.targetSquare,
+          promotion: piece,
+        });
+        if (moveResult) {
+          setChessPosition(chessGame.fen());
+        }
+      } catch {
+        // invalid
+      }
+      onMove(promotion.sourceSquare, promotion.targetSquare, piece);
+      setPromotion(null);
+      return;
+    }
+
     try {
       chessGame.move({
         from: promotion.sourceSquare,
@@ -260,6 +294,19 @@ export function ChessBoard() {
       return;
     }
 
+    if (onMove) {
+      try {
+        const moveResult = chessGame.move({ from, to: sq });
+        if (moveResult) {
+          setChessPosition(chessGame.fen());
+        }
+      } catch {
+        // invalid move
+      }
+      onMove(from, sq);
+      return;
+    }
+
     try {
       chessGame.move({ from, to: sq });
       setChessPosition(chessGame.fen());
@@ -281,6 +328,19 @@ export function ChessBoard() {
       if (!isLegal) return false;
       triggerPromotion(from, to);
       return true; // keep piece on board; promotion dialog will finalize
+    }
+
+    if (onMove) {
+      try {
+        const moveResult = chessGame.move({ from, to });
+        if (moveResult) {
+          setChessPosition(chessGame.fen());
+        }
+      } catch {
+        return false;
+      }
+      onMove(from, to);
+      return true;
     }
 
     try {

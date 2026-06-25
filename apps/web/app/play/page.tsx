@@ -1,9 +1,12 @@
 "use client"
 import { ChessBoard } from "@repo/ui/ChessBoard";
 import { Button } from "@repo/ui/Button"
-import { useRef } from "react";
+import { useRef, useState } from "react";
 
 export default function Play(){
+  const [fen, setFen] = useState("start");
+  const [playerColor, setPlayerColor] = useState<"white" | "black" | null>(null);
+  const [gameStarted, setGameStarted] = useState(false);
   const socketRef = useRef<WebSocket | null>(null);
   function connectWs() {
     const ws = new WebSocket("ws://localhost:8080")
@@ -19,16 +22,33 @@ export default function Play(){
     }
 
     ws.onmessage = (event) => {
-      console.log("Received:", event.data);
-    };
+      console.log("Received:", event.data)
+      const message = JSON.parse(event.data)
+      switch (message.type) {
+        case "game_started":
+        case "GAME_STARTED":
+          setPlayerColor(message.payload.color)
+          setGameStarted(true)
+          break
+
+        case "move":
+        case "MOVE":
+          setFen(message.payload?.fen ?? message.fen)
+          break
+
+        case "GAME_OVER":
+          alert("Game Over")
+          break
+      }
+    }
 
     ws.onerror = (error) => {
-      console.error("WebSocket error:", error);
-    };
+      console.error("WebSocket error:", error)
+    }
 
     ws.onclose = () => {
-      console.log("Connection closed");
-    };
+      console.log("Connection closed")
+    }
     socketRef.current = ws
   }
   return(
@@ -36,7 +56,22 @@ export default function Play(){
       <div className="pt-8 max-w-screen-lg w-full">
         <div className="grid grid-cols-6 gap-4 w-full">
           <div className="col-span-4  w-full flex justify-center">
-            <ChessBoard />
+            <ChessBoard
+              position={fen}
+              onMove={(from, to, promotion) => {
+                const move: { from: string; to: string; promotion?: string } = {
+                  from,
+                  to,
+                };
+                if (promotion) move.promotion = promotion;
+                socketRef.current?.send(
+                  JSON.stringify({
+                    type: "move",
+                    move,
+                  })
+                );
+              }}
+            />
           </div>
           <div className="col-span-2 bg-slate-800 w-full flex justify-center">
             <div className='pt-8'>
