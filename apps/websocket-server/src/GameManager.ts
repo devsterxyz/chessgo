@@ -1,6 +1,6 @@
 import type WebSocket from "ws"
 import { Game } from "./Game.js"
-import { INIT_GAME } from "./messages.js"
+import { INIT_GAME, MOVE } from "./messages.js"
 
 
 export class GameManager{
@@ -21,7 +21,7 @@ export class GameManager{
 
   removeUser(socket: WebSocket){
     this.users = this.users.filter(user => user != socket)
-    // stop the game here because user left 
+    // stop the game here because user left
   }
 
   private addHandler(socket: WebSocket){
@@ -35,6 +35,14 @@ export class GameManager{
         }
         else{
           this.pendingUser = socket
+        }
+      }
+
+      if(message.type == MOVE){
+        // logic if the type is move
+        const game = this.games.find(game => game.player1 === socket || game.player2 === socket)
+        if(game){
+          game.makeMove(socket, message.move)
         }
       }
     })
