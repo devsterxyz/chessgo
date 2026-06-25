@@ -58,6 +58,7 @@ export default function Play(){
           <div className="col-span-4  w-full flex justify-center">
             <ChessBoard
               position={fen}
+              playerColor={playerColor}
               onMove={(from, to, promotion) => {
                 const move: { from: string; to: string; promotion?: string } = {
                   from,

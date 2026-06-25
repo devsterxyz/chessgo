@@ -134,10 +134,11 @@ const FILES = ["a", "b", "c", "d", "e", "f", "g", "h"];
 
 interface ChessBoardProps {
   position?: string;
+  playerColor?: "white" | "black" | null;
   onMove?: (from: Square, to: Square, promotion?: PromotionPiece) => void;
 }
 
-export function ChessBoard({ position, onMove }: ChessBoardProps) {
+export function ChessBoard({ position, playerColor, onMove }: ChessBoardProps) {
   const chessGameRef = useRef(new Chess());
   const chessGame = chessGameRef.current;
 
@@ -375,6 +376,7 @@ export function ChessBoard({ position, onMove }: ChessBoardProps) {
   const chessboardOptions: ChessboardOptions = {
     id: "chess-board",
     position: chessPosition,
+    boardOrientation: playerColor ?? "white",
     onSquareClick,
     onPieceDrop,
     onSquareRightClick,
