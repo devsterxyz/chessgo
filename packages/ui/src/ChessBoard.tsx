@@ -227,18 +227,6 @@ export function ChessBoard({ position, playerColor, onMove }: ChessBoardProps) {
     if (!promotion) return;
 
     if (onMove) {
-      try {
-        const moveResult = chessGame.move({
-          from: promotion.sourceSquare,
-          to: promotion.targetSquare,
-          promotion: piece,
-        });
-        if (moveResult) {
-          setChessPosition(chessGame.fen());
-        }
-      } catch {
-        // invalid
-      }
       onMove(promotion.sourceSquare, promotion.targetSquare, piece);
       setPromotion(null);
       return;
@@ -296,14 +284,6 @@ export function ChessBoard({ position, playerColor, onMove }: ChessBoardProps) {
     }
 
     if (onMove) {
-      try {
-        const moveResult = chessGame.move({ from, to: sq });
-        if (moveResult) {
-          setChessPosition(chessGame.fen());
-        }
-      } catch {
-        // invalid move
-      }
       onMove(from, sq);
       return;
     }
@@ -332,14 +312,6 @@ export function ChessBoard({ position, playerColor, onMove }: ChessBoardProps) {
     }
 
     if (onMove) {
-      try {
-        const moveResult = chessGame.move({ from, to });
-        if (moveResult) {
-          setChessPosition(chessGame.fen());
-        }
-      } catch {
-        return false;
-      }
       onMove(from, to);
       return true;
     }
