@@ -18,9 +18,11 @@
     "typescript": "^5.9.2"
   },
   "dependencies": {
+    "@types/bcrypt": "^6.0.0",
     "@types/chess.js": "^0.13.7",
     "@types/express": "^5.0.6",
     "@types/jsonwebtoken": "^9.0.10",
+    "bcrypt": "^6.0.0",
     "chess.js": "^1.4.0",
     "express": "^5.2.1",
     "jsonwebtoken": "^9.0.3",
