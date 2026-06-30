@@ -1,45 +1,20 @@
-import 'dotenv/config'
-// import { createUser, findUserByEmail, updateUser } from "../db/user.db.js"
-import {
-  ACCESS_TOKEN_COOKIE,
-  COOKIE_OPTIONS,
-  generateAccessAndRefreshTokens,
-  REFRESH_TOKEN_COOKIE,
-} from '../utils/tokens.utils.js';
 import type { Request, Response } from "express";
 import bcrypt from "bcrypt";
+import { createUser, findUserByUsername } from "@repo/db"
 
-type AuthTokens = ReturnType<typeof generateAccessAndRefreshTokens>;
-
-const issueTokensAndRespond = (
-  res: Response,
-  safeUser: object,
-  statusCode: number,
-  message: string,
-  tokens: AuthTokens,
-) => {
-  const { accessToken, refreshToken } = tokens;
-
-  return res
-    .status(statusCode)
-    .cookie("access_token", accessToken, ACCESS_TOKEN_COOKIE)
-    .cookie("refresh_token", refreshToken, REFRESH_TOKEN_COOKIE)
-    .json({ message, user: safeUser });
-}
-
-const registerUser = async (req: Request, res: Response) => {
-  const {email, name, password} = req.body
+export const registerUser = async (req: Request, res: Response) => {
+  const { username, password } = req.body
 
   if (
-    [email, name, password].some((field) => field?.trim() === "")
+    [username, password].some((field) => typeof field !== "string" || field.trim() === "")
   ) {
     return res.status(400).
       json({
-        message: "all fields require"
+        message: "Username and password are required"
       })
   }
 
-  const existedUser = await findUserByEmail(email)
+  const existedUser = await findUserByUsername(username)
   if(existedUser){  
     return res.status(400)
       .json({ message: "User already exists" });
@@ -49,16 +24,14 @@ const registerUser = async (req: Request, res: Response) => {
     const hashedPassword = await bcrypt.hash(password, 10);
 
     const user = await createUser({
-      email, 
-      name,
       password: hashedPassword,
-      refreshToken: ""
+      username
     })
 
-    const tokens = generateAccessAndRefreshTokens(user.id);
-    const safeUser = await updateUser(user.id, tokens.refreshToken);
-
-    return issueTokensAndRespond(res, safeUser, 201, "User registered successfully", tokens);
+    return res.status(201).json({
+      message: "User registered successfully",
+      user
+    });
   }
   catch (e: any) {
     console.error("Register user error:", e);
@@ -66,7 +39,7 @@ const registerUser = async (req: Request, res: Response) => {
     if (e.code === "P2002") {
       return res.status(400).
         json({
-          message: "Duplicate field (email)",
+          message: "Username already exists",
         });
     }
 
@@ -75,4 +48,45 @@ const registerUser = async (req: Request, res: Response) => {
     });
   }
 
+}
+
+export const signInUser = async (req: Request, res: Response) => {
+  const { username, password } = req.body
+
+  if (
+    [username, password].some((field) => typeof field !== "string" || field.trim() === "")
+  ) {
+    return res.status(400).json({
+      message: "Username and password are required"
+    })
+  }
+
+  try {
+    const user = await findUserByUsername(username)
+
+    if (!user) {
+      return res.status(401).json({ message: "Invalid username or password" })
+    }
+
+    const isPasswordValid = await bcrypt.compare(password, user.passwork)
+
+    if (!isPasswordValid) {
+      return res.status(401).json({ message: "Invalid username or password" })
+    }
+
+    return res.status(200).json({
+      message: "Signed in successfully",
+      user: {
+        id: user.id,
+        username: user.username,
+        createdAt: user.createdAt
+      }
+    })
+  } catch (e) {
+    console.error("Sign in user error:", e);
+
+    return res.status(500).json({
+      message: "Server error",
+    });
+  }
 }

@@ -1,21 +1,41 @@
 import { WebSocketServer } from "ws";
 import { GameManager } from "./GameManager.js";
 import express from "express";
+import userRouter from './routes/user.routes.js'
 
 let app = express()
+const httpPort = Number(process.env.PORT ?? 3000)
+const websocketPort = Number(process.env.WS_PORT ?? 8080)
 
-app.listen(3000, (err?: NodeJS.ErrnoException)=>{
-  if(err){
-    console.log(err)
+app.use((req, res, next) => {
+  const origin = req.headers.origin
+
+  if (origin && /^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin)) {
+    res.header("Access-Control-Allow-Origin", origin)
+    res.header("Access-Control-Allow-Credentials", "true")
   }
-  console.log(`Server running on port 3000`)
+
+  res.header("Access-Control-Allow-Headers", "Content-Type")
+  res.header("Access-Control-Allow-Methods", "GET,POST,OPTIONS")
+
+  if (req.method === "OPTIONS") {
+    return res.sendStatus(204)
+  }
+
+  next()
 })
 
-import userRouter from './routes/user.routes.js'
+app.use(express.json())
+
+app.listen(httpPort, () => {
+  console.log(`Server running on port ${httpPort}`)
+}).on("error", (err: NodeJS.ErrnoException) => {
+  console.error(`HTTP server failed on port ${httpPort}:`, err.message)
+})
 
 app.use('/user', userRouter)
 
-const wss = new WebSocketServer({ port: 8080 });
+const wss = new WebSocketServer({ port: websocketPort });
 const gameManager = new GameManager();
 
 wss.on('connection', function connection(ws){
@@ -23,5 +43,10 @@ wss.on('connection', function connection(ws){
   ws.on("disconnect", () => gameManager.removeUser(ws))
 })
 
-console.log("WebSocket server running on ws://localhost:8080");
+wss.on("listening", () => {
+  console.log(`WebSocket server running on ws://localhost:${websocketPort}`);
+})
 
+wss.on("error", (err: NodeJS.ErrnoException) => {
+  console.error(`WebSocket server failed on port ${websocketPort}:`, err.message)
+})

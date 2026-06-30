@@ -1,59 +1,54 @@
-import 'dotenv/config'
-import * as Prisma from '@prisma/client'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { PrismaPg } from '@prisma/adapter-pg'
+import { PrismaClient } from '@prisma/client'
+import { config } from 'dotenv'
 
 type CreateUserInput = {
-  email: string;
-  name: string;
-  password?: string | null;
-  googleId?: string | null;
-  refreshToken?: string;
+  username: string;
+  password: string;
 };
 
-export const client = new (Prisma as any).PrismaClient()
+const envPath = join(dirname(fileURLToPath(import.meta.url)), '.env')
 
-export const findUserByEmail = (email: string) => {
+config({ path: envPath })
+
+const connectionString = process.env.DATABASE_URL
+
+if (!connectionString) {
+  throw new Error('DATABASE_URL is required to initialize PrismaClient')
+}
+
+const adapter = new PrismaPg({ connectionString })
+
+export const client = new PrismaClient({ adapter })
+
+export const findUserByUsername = (username: string) => {
   return client.user.findUnique({
-    where: {email}
+    where: { username }
   })
 }
 
 export const createUser = (data: CreateUserInput) => {
   return client.user.create({
-    data
-  })
-}
-
-export const updateUserGoogleId = (id: number, googleId: string) => {
-  return client.user.update({
-    where: {id},
     data: {
-      googleId
+      username: data.username,
+      passwork: data.password
+    },
+    select: {
+      id: true,
+      username: true,
+      createdAt: true
     }
   })
 }
 
 export const findUserByUserId = (id: number) => {
   return client.user.findUnique({
-    where: {id},
+    where: { id },
     select: {
       id: true,
-      email: true,
-      name: true,
-      createdAt: true
-    }
-  })
-}
-
-export const updateUser = (id: number, refreshToken: string) => {
-  return client.user.update({
-    where: {id},
-    data: {
-      refreshToken
-    },
-    select: {
-      id: true,
-      email: true,
-      name: true,
+      username: true,
       createdAt: true
     }
   })
