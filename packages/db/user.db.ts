@@ -6,7 +6,7 @@ import { config } from 'dotenv'
 
 type CreateUserInput = {
   username: string;
-  password: string;
+  password?: string;
 };
 
 const envPath = join(dirname(fileURLToPath(import.meta.url)), '.env')
@@ -33,12 +33,22 @@ export const createUser = (data: CreateUserInput) => {
   return client.user.create({
     data: {
       username: data.username,
-      passwork: data.password
+      passwork: data.password ?? ""
     },
     select: {
       id: true,
       username: true,
       createdAt: true
+    }
+  })
+}
+
+export const countGuestUsers = () => {
+  return client.user.count({
+    where: {
+      username: {
+        startsWith: "guestuser"
+      }
     }
   })
 }

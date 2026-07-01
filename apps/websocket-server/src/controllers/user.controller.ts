@@ -1,6 +1,6 @@
 import type { Request, Response } from "express";
 import bcrypt from "bcrypt";
-import { createUser, findUserByUsername } from "@repo/db"
+import { countGuestUsers, createUser, findUserByUsername } from "@repo/db"
 
 export const registerUser = async (req: Request, res: Response) => {
   const { username, password } = req.body
@@ -84,6 +84,44 @@ export const signInUser = async (req: Request, res: Response) => {
     })
   } catch (e) {
     console.error("Sign in user error:", e);
+
+    return res.status(500).json({
+      message: "Server error",
+    });
+  }
+}
+
+export const logoutUser = async (_req: Request, res: Response) => {
+  return res.status(200).json({
+    message: "Logged out successfully"
+  })
+}
+
+export const createGuestUser = async(req: Request, res: Response) => {
+  try {
+    let nextGuestNumber = (await countGuestUsers()) + 1;
+
+    while (true) {
+      try {
+        const username = `guestuser${nextGuestNumber}`;
+        const user = await createUser({
+          username
+        });
+
+        return res.status(201).json({
+          message: "Guest user created successfully",
+          user
+        });
+      } catch (e: any) {
+        if (e.code !== "P2002") {
+          throw e;
+        }
+
+        nextGuestNumber += 1;
+      }
+    }
+  } catch (e) {
+    console.error("Create guest user error:", e);
 
     return res.status(500).json({
       message: "Server error",
