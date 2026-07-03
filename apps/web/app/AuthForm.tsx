@@ -42,6 +42,8 @@ export function AuthForm() {
       }
 
       localStorage.setItem("chessgo_user", JSON.stringify(data.user));
+      localStorage.setItem("chessgo_access_token", data.accessToken);
+      localStorage.setItem("chessgo_refresh_token", data.refreshToken);
       router.push("/play");
     } catch {
       setMessage("Could not connect to the backend server");
@@ -71,6 +73,8 @@ export function AuthForm() {
       }
 
       localStorage.setItem("chessgo_user", JSON.stringify(data.user));
+      localStorage.setItem("chessgo_access_token", data.accessToken);
+      localStorage.setItem("chessgo_refresh_token", data.refreshToken);
       router.push("/play");
     } catch {
       setMessage("Could not connect to the backend server");

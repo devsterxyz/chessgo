@@ -1,6 +1,23 @@
 import type { Request, Response } from "express";
 import bcrypt from "bcrypt";
 import { countGuestUsers, createUser, findUserByUsername } from "@repo/db"
+import { generateAccessAndRefreshTokens, generateAccessToken } from "../utils/tokens.utils.js";
+
+type AuthTokens = ReturnType<typeof generateAccessAndRefreshTokens>;
+
+const issueTokensAndRespond = (
+  res: Response,
+  safeUser: object,
+  statusCode: number,
+  message: string,
+  tokens: AuthTokens,
+) => {
+  const { accessToken, refreshToken } = tokens;
+
+  return res
+    .status(statusCode)
+    .json({ message, user: safeUser, accessToken, refreshToken });
+}
 
 export const registerUser = async (req: Request, res: Response) => {
   const { username, password } = req.body
@@ -15,23 +32,32 @@ export const registerUser = async (req: Request, res: Response) => {
   }
 
   const existedUser = await findUserByUsername(username)
-  if(existedUser){  
+  if (existedUser) {
     return res.status(400)
       .json({ message: "User already exists" });
   }
-  
-  try{
+
+  try {
     const hashedPassword = await bcrypt.hash(password, 10);
 
     const user = await createUser({
       password: hashedPassword,
       username
     })
+    const tokens = generateAccessAndRefreshTokens(user.id);
+    const safeUser = {
+      id: user.id,
+      username: user.username,
+      createdAt: user.createdAt
+    };
 
-    return res.status(201).json({
-      message: "User registered successfully",
-      user
-    });
+    return issueTokensAndRespond(
+      res,
+      safeUser,
+      201,
+      "User registered successfully",
+      tokens
+    );
   }
   catch (e: any) {
     console.error("Register user error:", e);
@@ -68,20 +94,30 @@ export const signInUser = async (req: Request, res: Response) => {
       return res.status(401).json({ message: "Invalid username or password" })
     }
 
-    const isPasswordValid = await bcrypt.compare(password, user.passwork)
+    if (!user.password) {
+      return res.status(401).json({ message: "Invalid username or password" })
+    }
+
+    const isPasswordValid = await bcrypt.compare(password, user.password)
 
     if (!isPasswordValid) {
       return res.status(401).json({ message: "Invalid username or password" })
     }
 
-    return res.status(200).json({
-      message: "Signed in successfully",
-      user: {
-        id: user.id,
-        username: user.username,
-        createdAt: user.createdAt
-      }
-    })
+    const tokens = generateAccessAndRefreshTokens(user.id);
+    const safeUser = {
+      id: user.id,
+      username: user.username,
+      createdAt: user.createdAt
+    };
+
+    return issueTokensAndRespond(
+      res,
+      safeUser,
+      200,
+      "Signed in successfully",
+      tokens
+    );
   } catch (e) {
     console.error("Sign in user error:", e);
 
@@ -91,13 +127,20 @@ export const signInUser = async (req: Request, res: Response) => {
   }
 }
 
-export const logoutUser = async (_req: Request, res: Response) => {
-  return res.status(200).json({
-    message: "Logged out successfully"
-  })
+export const logoutUser = async (req: Request, res: Response) => {
+  try {
+    return res
+      .status(200)
+      .json({ message: "Logged out successfully" });
+  } catch (e: any) {
+    return res.status(500).json({
+      message: "Unable to logout user"
+    });
+  }
 }
 
-export const createGuestUser = async(req: Request, res: Response) => {
+
+export const createGuestUser = async (req: Request, res: Response) => {
   try {
     let nextGuestNumber = (await countGuestUsers()) + 1;
 
@@ -107,11 +150,20 @@ export const createGuestUser = async(req: Request, res: Response) => {
         const user = await createUser({
           username
         });
+        const tokens = generateAccessAndRefreshTokens(user.id);
+        const safeUser = {
+          id: user.id,
+          username: user.username,
+          createdAt: user.createdAt
+        };
 
-        return res.status(201).json({
-          message: "Guest user created successfully",
-          user
-        });
+        return issueTokensAndRespond(
+          res,
+          safeUser,
+          201,
+          "Guest user created successfully",
+          tokens
+        );
       } catch (e: any) {
         if (e.code !== "P2002") {
           throw e;

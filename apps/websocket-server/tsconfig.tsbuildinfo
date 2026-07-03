@@ -1,1 +1,1 @@
-{"root":["./src/Game.ts","./src/GameManager.ts","./src/index.ts","./src/messages.ts","./src/controllers/user.controller.ts","./src/routes/user.routes.ts","./src/utils/tokens.utils.ts"],"version":"5.9.2"}
+{"root":["./src/Game.ts","./src/GameManager.ts","./src/index.ts","./src/messages.ts","./src/controllers/user.controller.ts","./src/middleware/user.middleware.ts","./src/routes/user.routes.ts","./src/types/express.d.ts","./src/utils/tokens.utils.ts"],"version":"5.9.2"}

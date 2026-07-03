@@ -1,14 +1,34 @@
 "use client"
 import { ChessBoard } from "@repo/ui/ChessBoard";
 import { Button } from "@repo/ui/Button"
-import { useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
 import { Chess } from "chess.js";
+import { Navbar } from "../Navbar";
 
 export default function Play(){
+  const router = useRouter();
+  const [isAuthorized, setIsAuthorized] = useState(false);
   const [fen, setFen] = useState(new Chess().fen());
   const [playerColor, setPlayerColor] = useState<"white" | "black" | null>(null);
   const [gameStarted, setGameStarted] = useState(false);
   const socketRef = useRef<WebSocket | null>(null);
+
+  useEffect(() => {
+    const user = localStorage.getItem("chessgo_user");
+
+    if (!user) {
+      router.replace("/");
+      return;
+    }
+
+    setIsAuthorized(true);
+  }, [router]);
+
+  if (!isAuthorized) {
+    return null;
+  }
+
   function connectWs() {
     if (
       socketRef.current &&
@@ -62,37 +82,40 @@ export default function Play(){
     socketRef.current = ws
   }
   return(
-    <div className="flex justify-center">
-      <div className="pt-8 max-w-screen-lg w-full">
-        <div className="grid grid-cols-6 gap-4 w-full">
-          <div className="col-span-4  w-full flex justify-center">
-            <ChessBoard
-              position={fen}
-              playerColor={playerColor}
-              onMove={(from, to, promotion) => {
-                const move: { from: string; to: string; promotion?: string } = {
-                  from,
-                  to,
-                };
-                if (promotion) move.promotion = promotion;
-                socketRef.current?.send(
-                  JSON.stringify({
-                    type: "move",
-                    move,
-                  })
-                );
-              }}
-            />
-          </div>
-          <div className="col-span-2 bg-slate-800 w-full flex justify-center">
-            <div className='pt-8'>
-              <Button onclick={connectWs}>
-                Play
-              </Button>
+    <main className="min-h-screen bg-neutral-950 text-white">
+      <Navbar />
+      <div className="flex justify-center px-4">
+        <div className="pt-8 max-w-screen-lg w-full">
+          <div className="grid grid-cols-6 gap-4 w-full">
+            <div className="col-span-4  w-full flex justify-center">
+              <ChessBoard
+                position={fen}
+                playerColor={playerColor}
+                onMove={(from, to, promotion) => {
+                  const move: { from: string; to: string; promotion?: string } = {
+                    from,
+                    to,
+                  };
+                  if (promotion) move.promotion = promotion;
+                  socketRef.current?.send(
+                    JSON.stringify({
+                      type: "move",
+                      move,
+                    })
+                  );
+                }}
+              />
+            </div>
+            <div className="col-span-2 bg-slate-800 w-full flex justify-center">
+              <div className='pt-8'>
+                <Button onclick={connectWs}>
+                  Play
+                </Button>
+              </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
+    </main>
   )
 }

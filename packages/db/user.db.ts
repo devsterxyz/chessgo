@@ -33,7 +33,7 @@ export const createUser = (data: CreateUserInput) => {
   return client.user.create({
     data: {
       username: data.username,
-      passwork: data.password ?? ""
+      password: data.password ?? ""
     },
     select: {
       id: true,
@@ -49,6 +49,20 @@ export const countGuestUsers = () => {
       username: {
         startsWith: "guestuser"
       }
+    }
+  })
+}
+
+export const updateUser = (id: number, refreshToken: string) => {
+  return client.user.update({
+    where: { id },
+    data: {
+      RefreshToken: refreshToken
+    },
+    select: {
+      id: true,
+      username: true,
+      createdAt: true
     }
   })
 }
