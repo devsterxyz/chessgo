@@ -4,7 +4,7 @@ import express from "express";
 import userRouter from './routes/user.routes.js'
 
 let app = express()
-const httpPort = Number(process.env.PORT ?? 3000)
+const httpPort = Number(process.env.PORT ?? 3002)
 const websocketPort = Number(process.env.WS_PORT ?? 8080)
 
 app.use((req, res, next) => {

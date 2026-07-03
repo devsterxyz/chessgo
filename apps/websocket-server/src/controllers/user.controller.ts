@@ -141,6 +141,7 @@ export const logoutUser = async (req: Request, res: Response) => {
 
 
 export const createGuestUser = async (req: Request, res: Response) => {
+  console.log("Creating guest user...");
   try {
     let nextGuestNumber = (await countGuestUsers()) + 1;
 

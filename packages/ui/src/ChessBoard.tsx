@@ -336,7 +336,6 @@ export function ChessBoard({ position, playerColor, onMove }: ChessBoardProps) {
     setHighlightedSquares((prev) => {
       const next = { ...prev };
       if (next[square]) {
-        // right-clicking an already-highlighted square clears it
         delete next[square];
       } else {
         next[square] = { backgroundColor: "rgba(188, 52, 52, 0.8)" };
