@@ -1,15 +1,15 @@
 import type WebSocket from "ws"
+import { randomUUID } from "crypto"
 import { Game } from "./Game.js"
 import { INIT_GAME, MOVE } from "./messages.js"
 
-
 export class GameManager{
-  private games: Game[]
+  private games: Map<string, Game>
   private pendingUser: WebSocket | null
   private users: WebSocket[]
 
   constructor(){
-    this.games = []
+    this.games = new Map()
     this.pendingUser = null
     this.users = []
   }
@@ -21,7 +21,28 @@ export class GameManager{
 
   removeUser(socket: WebSocket){
     this.users = this.users.filter(user => user != socket)
-    // stop the game here because user left
+
+    if (this.pendingUser === socket) {
+      this.pendingUser = null
+    }
+
+    const entry = Array.from(this.games.entries()).find(([_id, game]) =>
+      game.player1 === socket || game.player2 === socket
+    )
+
+    if (entry) {
+      const [id, game] = entry
+      this.games.delete(id)
+      const opponent = game.player1 === socket ? game.player2 : game.player1
+      try {
+        opponent.send(JSON.stringify({
+          type: "OPPONENT_DISCONNECTED",
+          payload: {},
+        }))
+      } catch {
+        // ignore if opponent already disconnected
+      }
+    }
   }
 
   private addHandler(socket: WebSocket){
@@ -29,18 +50,24 @@ export class GameManager{
       const message = JSON.parse(data.toString())
       if(message.type == INIT_GAME){
         if(this.pendingUser){
-          const game = new Game(this.pendingUser, socket)
-          this.games.push(game)
+          const gameId = randomUUID()
+          const game = new Game(gameId, this.pendingUser, socket)
+          this.games.set(gameId, game)
           this.pendingUser = null
         }
         else{
           this.pendingUser = socket
+          socket.send(JSON.stringify({
+            type: "WAITING_FOR_OPPONENT",
+            payload: {},
+          }))
         }
       }
 
       if(message.type == MOVE){
-        // logic if the type is move
-        const game = this.games.find(game => game.player1 === socket || game.player2 === socket)
+        const game = Array.from(this.games.values()).find(game =>
+          game.player1 === socket || game.player2 === socket
+        )
         if(game){
           game.makeMove(socket, message.move)
         }

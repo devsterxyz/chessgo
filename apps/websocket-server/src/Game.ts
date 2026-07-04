@@ -1,28 +1,38 @@
 import { Chess } from "chess.js";
 import type WebSocket from "ws";
-import { GAME_STARTED, INIT_GAME } from "./messages.js";
-
+import { GAME_STARTED } from "./messages.js";
 
 export class Game{
+  public id: string
   public player1: WebSocket
   public player2: WebSocket
   public board: Chess
   public moveCount = 0
 
-  constructor(player1: WebSocket, player2: WebSocket){
+  constructor(id: string, player1: WebSocket, player2: WebSocket){
+    this.id = id
     this.player1 = player1
     this.player2 = player2
     this.board = new Chess()
+    const initialFen = this.board.fen()
+    const route = `/game/${this.id}`
+
     this.player1.send(JSON.stringify({
       type: GAME_STARTED,
       payload: {
-        color: "white"
+        color: "white",
+        gameId: this.id,
+        route,
+        fen: initialFen,
       }
     }))
     this.player2.send(JSON.stringify({
       type: GAME_STARTED,
       payload: {
-        color: "black"
+        color: "black",
+        gameId: this.id,
+        route,
+        fen: initialFen,
       }
     }))
   }

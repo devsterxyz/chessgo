@@ -149,6 +149,7 @@ export function ChessBoard({ position, playerColor, onMove }: ChessBoardProps) {
   >({});
   const [promotion, setPromotion] = useState<PromotionState | null>(null);
   const [squareWidth, setSquareWidth] = useState(0);
+  const [boardSize, setBoardSize] = useState(560);
 
   useEffect(() => {
     if (!position || position === chessPosition) return;
@@ -165,13 +166,17 @@ export function ChessBoard({ position, playerColor, onMove }: ChessBoardProps) {
     Record<string, React.CSSProperties>
   >({});
 
-  // Measure square width once the board renders
+  // Measure square width once the board renders and keep the board responsive
   useEffect(() => {
     function measure() {
       const sq = document.querySelector<HTMLElement>(
         '[data-column="a"][data-row="1"]'
       );
       if (sq) setSquareWidth(sq.getBoundingClientRect().width);
+
+      const maxWidth = Math.min(window.innerWidth - 32, 640);
+      const maxHeight = Math.min(window.innerHeight - 220, 640);
+      setBoardSize(Math.max(280, Math.min(maxWidth, maxHeight)));
     }
     measure();
     window.addEventListener("resize", measure);
@@ -344,24 +349,31 @@ export function ChessBoard({ position, playerColor, onMove }: ChessBoardProps) {
     });
   }
 
+  const boardOrientation = playerColor ?? "white";
+
   const chessboardOptions: ChessboardOptions = {
     id: "chess-board",
     position: chessPosition,
-    boardOrientation: playerColor ?? "white",
+    boardOrientation,
     onSquareClick,
     onPieceDrop,
     onSquareRightClick,
     onSquareMouseDown,
     lightSquareStyle: { backgroundColor: "#D9E4E8" },
     darkSquareStyle: { backgroundColor: "#7A9CB1" },
+    boardStyle: { width: boardSize, maxWidth: "100%", borderRadius: 4 },
     pieces: customPieces,
     // option-move dots take visual priority over a manual highlight on the same square
     squareStyles: { ...highlightedSquares, ...optionSquares },
   };
 
   return (
-    <div style={{ position: "relative", display: "inline-block" }}>
-      <Chessboard options={chessboardOptions} />
+    <div style={{ position: "relative", display: "inline-block", width: "100%" }}>
+      <div style={{ width: "100%", display: "flex", justifyContent: "center" }}>
+        <div style={{ width: boardSize, maxWidth: "100%" }}>
+          <Chessboard key={boardOrientation} options={chessboardOptions} />
+        </div>
+      </div>
       {promotion && squareWidth > 0 && (
         <PromotionDialog
           promotion={promotion}
