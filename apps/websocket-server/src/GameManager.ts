@@ -158,14 +158,7 @@ export class GameManager{
     }
   }
 
-  private endGame(id: string, payload: {
-    draw: boolean
-    winner: "white" | "black" | null
-    reason: "player_disconnected" | "both_players_disconnected"
-  }){
-    const game = this.games.get(id)
-    if (!game) return
-
+  private deleteGame(id: string){
     const timer = this.disconnectTimers.get(id)
     if (timer) {
       clearTimeout(timer)
@@ -174,6 +167,17 @@ export class GameManager{
 
     this.disconnectedPlayers.delete(id)
     this.games.delete(id)
+  }
+
+  private endGame(id: string, payload: {
+    draw: boolean
+    winner: "white" | "black" | null
+    reason: "player_disconnected" | "both_players_disconnected"
+  }){
+    const game = this.games.get(id)
+    if (!game) return
+
+    this.deleteGame(id)
 
     const message = JSON.stringify({
       type: "GAME_OVER",
@@ -233,7 +237,10 @@ export class GameManager{
           game.isPlayer(userId) && game.getPlayerSocket(userId) === socket
         )
         if(game){
-          game.makeMove(socket, message.move)
+          const didEndGame = game.makeMove(socket, message.move)
+          if (didEndGame) {
+            this.deleteGame(game.id)
+          }
         }
       }
     })

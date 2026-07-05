@@ -101,11 +101,11 @@ export class Game{
   }){
     if(this.moveCount % 2 === 0 && socket !== this.player1){
       console.log("early return 1")
-      return
+      return false
     }
     if(this.moveCount%2 === 1 && socket !== this.player2){
       console.log("early return 2")
-      return
+      return false
     }
     console.log("did not early return")
 
@@ -113,7 +113,7 @@ export class Game{
       const result = this.board.move(move);
       if (!result) {
         console.log("Illegal move");
-        return;
+        return false;
       }
       this.moveCount++;
 
@@ -141,10 +141,12 @@ export class Game{
 
           this.sendToSocket(this.player1, gameOverMessage);
           this.sendToSocket(this.player2, gameOverMessage);
+          return true
         }
       }
       catch (err) {
         console.log("Invalid move:", err);
       }
+      return false
   }
 }

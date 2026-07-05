@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { closeGameSocket } from "./lib/gameSocket";
 
 type StoredUser = {
   username?: string;
@@ -44,6 +45,7 @@ export function Navbar() {
   }, []);
 
   const handleLogout = () => {
+    closeGameSocket();
     localStorage.removeItem("chessgo_user");
     localStorage.removeItem("chessgo_access_token");
     localStorage.removeItem("chessgo_refresh_token");
@@ -54,7 +56,7 @@ export function Navbar() {
   return (
     <nav className="border-b border-neutral-800 bg-neutral-950 px-4 text-white">
       <div className="mx-auto flex h-16 max-w-screen-lg items-center justify-between">
-        <Link href="/play">
+        <Link href="/play" onClick={closeGameSocket}>
           <h1 className="text-xl font-bold">ChessGo</h1>
         </Link>
 
