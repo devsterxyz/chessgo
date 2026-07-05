@@ -36,6 +36,17 @@ export default function GamePage() {
 
   useEffect(() => {
     const ws = createGameSocket()
+    const sendResumeGame = () => {
+      const user = JSON.parse(localStorage.getItem("chessgo_user") ?? "{}")
+      ws.send(JSON.stringify({
+        type: "resume_game",
+        payload: {
+          gameId,
+          accessToken: localStorage.getItem("chessgo_access_token"),
+          userId: user.id,
+        },
+      }))
+    }
 
     const handleMessage = (message: any) => {
       if (!message?.type) return
@@ -78,8 +89,12 @@ export default function GamePage() {
     let onOpen: (() => void) | null = null
     if (ws.readyState === WebSocket.OPEN) {
       setConnected(true)
+      sendResumeGame()
     } else {
-      onOpen = () => setConnected(true)
+      onOpen = () => {
+        setConnected(true)
+        sendResumeGame()
+      }
       ws.addEventListener("open", onOpen)
     }
 

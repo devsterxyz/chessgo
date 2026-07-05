@@ -50,16 +50,25 @@ export default function Play(){
 
   function connectWs() {
     const ws = createGameSocket()
+    const accessToken = localStorage.getItem("chessgo_access_token")
+    const user = JSON.parse(localStorage.getItem("chessgo_user") ?? "{}")
+    const initGameMessage = JSON.stringify({
+      type: "init_game",
+      payload: {
+        accessToken,
+        userId: user.id,
+      },
+    })
 
     if (ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({ type: "init_game", payload: {} }))
+      ws.send(initGameMessage)
       setWaiting(true)
       return
     }
 
     if (ws.readyState === WebSocket.CONNECTING) {
       ws.addEventListener("open", function onOpen() {
-        ws.send(JSON.stringify({ type: "init_game", payload: {} }))
+        ws.send(initGameMessage)
         setWaiting(true)
         ws.removeEventListener("open", onOpen)
       })
@@ -67,7 +76,7 @@ export default function Play(){
     }
 
     ws.addEventListener("open", function onOpen() {
-      ws.send(JSON.stringify({ type: "init_game", payload: {} }))
+      ws.send(initGameMessage)
       setWaiting(true)
       ws.removeEventListener("open", onOpen)
     })

@@ -6,18 +6,22 @@ export class Game{
   public id: string
   public player1: WebSocket
   public player2: WebSocket
+  public player1Id: number
+  public player2Id: number
   public board: Chess
   public moveCount = 0
 
-  constructor(id: string, player1: WebSocket, player2: WebSocket){
+  constructor(id: string, player1: WebSocket, player2: WebSocket, player1Id: number, player2Id: number){
     this.id = id
     this.player1 = player1
     this.player2 = player2
+    this.player1Id = player1Id
+    this.player2Id = player2Id
     this.board = new Chess()
     const initialFen = this.board.fen()
     const route = `/game/${this.id}`
 
-    this.player1.send(JSON.stringify({
+    this.sendToSocket(this.player1, JSON.stringify({
       type: GAME_STARTED,
       payload: {
         color: "white",
@@ -26,7 +30,7 @@ export class Game{
         fen: initialFen,
       }
     }))
-    this.player2.send(JSON.stringify({
+    this.sendToSocket(this.player2, JSON.stringify({
       type: GAME_STARTED,
       payload: {
         color: "black",
@@ -35,6 +39,59 @@ export class Game{
         fen: initialFen,
       }
     }))
+  }
+
+  replacePlayer(userId: number, socket: WebSocket){
+    if (userId === this.player1Id) {
+      this.player1 = socket
+      this.sendState(socket, "white")
+      return true
+    }
+
+    if (userId === this.player2Id) {
+      this.player2 = socket
+      this.sendState(socket, "black")
+      return true
+    }
+
+    return false
+  }
+
+  isPlayer(userId: number){
+    return userId === this.player1Id || userId === this.player2Id
+  }
+
+  getPlayerSocket(userId: number){
+    if (userId === this.player1Id) return this.player1
+    if (userId === this.player2Id) return this.player2
+    return null
+  }
+
+  getOpponentColor(userId: number){
+    if (userId === this.player1Id) return "black"
+    if (userId === this.player2Id) return "white"
+    return null
+  }
+
+  private sendState(socket: WebSocket, color: "white" | "black"){
+    this.sendToSocket(socket, JSON.stringify({
+      type: GAME_STARTED,
+      payload: {
+        color,
+        gameId: this.id,
+        route: `/game/${this.id}`,
+        fen: this.board.fen(),
+        moveCount: this.moveCount,
+      }
+    }))
+  }
+
+  private sendToSocket(socket: WebSocket, message: string){
+    try {
+      socket.send(message)
+    } catch {
+      // The socket may be temporarily disconnected while the game is resumable.
+    }
   }
 
   makeMove(socket: WebSocket, move: {
@@ -68,8 +125,8 @@ export class Game{
           fen: this.board.fen(),
         },
       });
-      this.player1.send(message);
-      this.player2.send(message);
+      this.sendToSocket(this.player1, message);
+      this.sendToSocket(this.player2, message);
 
         if (this.board.isGameOver()) {
           const gameOverMessage = JSON.stringify({
@@ -82,8 +139,8 @@ export class Game{
             },
           });
 
-          this.player1.send(gameOverMessage);
-          this.player2.send(gameOverMessage);
+          this.sendToSocket(this.player1, gameOverMessage);
+          this.sendToSocket(this.player2, gameOverMessage);
         }
       }
       catch (err) {
