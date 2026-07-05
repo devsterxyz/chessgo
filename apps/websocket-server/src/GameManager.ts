@@ -7,11 +7,16 @@ export class GameManager{
   private games: Map<string, Game>
   private pendingUser: WebSocket | null
   private users: WebSocket[]
+  private disconnectedPlayers: Map<string, Set<WebSocket>>
+  private disconnectTimers: Map<string, NodeJS.Timeout>
+  private readonly disconnectGraceMs = 10_000
 
   constructor(){
     this.games = new Map()
     this.pendingUser = null
     this.users = []
+    this.disconnectedPlayers = new Map()
+    this.disconnectTimers = new Map()
   }
 
   addUser(socket: WebSocket){
@@ -32,15 +37,67 @@ export class GameManager{
 
     if (entry) {
       const [id, game] = entry
-      this.games.delete(id)
-      const opponent = game.player1 === socket ? game.player2 : game.player1
+      const disconnectedPlayers = this.disconnectedPlayers.get(id) ?? new Set<WebSocket>()
+      disconnectedPlayers.add(socket)
+      this.disconnectedPlayers.set(id, disconnectedPlayers)
+
+      if (disconnectedPlayers.has(game.player1) && disconnectedPlayers.has(game.player2)) {
+        this.endGame(id, {
+          draw: false,
+          winner: null,
+          reason: "both_players_disconnected",
+        })
+        return
+      }
+
+      if (!this.disconnectTimers.has(id)) {
+        const timer = setTimeout(() => {
+          const latestGame = this.games.get(id)
+          const latestDisconnectedPlayers = this.disconnectedPlayers.get(id)
+          if (!latestGame || !latestDisconnectedPlayers?.has(socket)) {
+            return
+          }
+
+          const winner = latestGame.player1 === socket ? "black" : "white"
+          this.endGame(id, {
+            draw: false,
+            winner,
+            reason: "player_disconnected",
+          })
+        }, this.disconnectGraceMs)
+
+        this.disconnectTimers.set(id, timer)
+      }
+    }
+  }
+
+  private endGame(id: string, payload: {
+    draw: boolean
+    winner: "white" | "black" | null
+    reason: "player_disconnected" | "both_players_disconnected"
+  }){
+    const game = this.games.get(id)
+    if (!game) return
+
+    const timer = this.disconnectTimers.get(id)
+    if (timer) {
+      clearTimeout(timer)
+      this.disconnectTimers.delete(id)
+    }
+
+    this.disconnectedPlayers.delete(id)
+    this.games.delete(id)
+
+    const message = JSON.stringify({
+      type: "GAME_OVER",
+      payload,
+    })
+
+    for (const player of [game.player1, game.player2]) {
       try {
-        opponent.send(JSON.stringify({
-          type: "OPPONENT_DISCONNECTED",
-          payload: {},
-        }))
+        player.send(message)
       } catch {
-        // ignore if opponent already disconnected
+        // The player may already be disconnected.
       }
     }
   }

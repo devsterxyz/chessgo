@@ -1,8 +1,30 @@
+"use client";
+
 import Link from "next/link";
 import { Button } from "@repo/ui/Button";
 import { AuthForm } from "./AuthForm";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 
 export default function Home() {
+  const router = useRouter();
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+
+  useEffect(() => {
+    const user = localStorage.getItem("chessgo_user");
+
+    if (user) {
+      router.replace("/play");
+      return;
+    }
+
+    setIsCheckingAuth(false);
+  }, [router]);
+
+  if (isCheckingAuth) {
+    return null;
+  }
+
   return (
     <main className="min-h-screen bg-neutral-950 px-4 py-10 text-white">
       <div className="mx-auto grid max-w-6xl gap-10 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">

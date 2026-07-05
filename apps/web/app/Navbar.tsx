@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
@@ -53,7 +54,9 @@ export function Navbar() {
   return (
     <nav className="border-b border-neutral-800 bg-neutral-950 px-4 text-white">
       <div className="mx-auto flex h-16 max-w-screen-lg items-center justify-between">
-        <h1 className="text-xl font-bold">ChessGo</h1>
+        <Link href="/play">
+          <h1 className="text-xl font-bold">ChessGo</h1>
+        </Link>
 
         <div ref={menuRef} className="relative">
           <button
