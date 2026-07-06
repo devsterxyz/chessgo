@@ -25,6 +25,18 @@ export default function Play(){
   }, [router]);
 
   useEffect(() => {
+    const sendActiveGameRequest = (ws: WebSocket) => {
+      const accessToken = localStorage.getItem("chessgo_access_token")
+      const user = JSON.parse(localStorage.getItem("chessgo_user") ?? "{}")
+      ws.send(JSON.stringify({
+        type: "get_active_game",
+        payload: {
+          accessToken,
+          userId: user.id,
+        },
+      }))
+    }
+
     setGameSocketListener((message) => {
       if (!message?.type) return;
 
@@ -39,7 +51,23 @@ export default function Play(){
       }
     })
 
+    const ws = createGameSocket()
+    let onOpen: (() => void) | null = null
+
+    if (ws.readyState === WebSocket.OPEN) {
+      sendActiveGameRequest(ws)
+    } else {
+      onOpen = () => {
+        sendActiveGameRequest(ws)
+        ws.removeEventListener("open", onOpen!)
+      }
+      ws.addEventListener("open", onOpen)
+    }
+
     return () => {
+      if (onOpen) {
+        ws.removeEventListener("open", onOpen)
+      }
       setGameSocketListener(null)
     }
   }, [router])

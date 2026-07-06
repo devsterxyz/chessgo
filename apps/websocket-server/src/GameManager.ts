@@ -2,7 +2,7 @@ import type WebSocket from "ws"
 import { randomUUID } from "crypto"
 import jwt from "jsonwebtoken"
 import { Game } from "./Game.js"
-import { INIT_GAME, MOVE, RESUME_GAME } from "./messages.js"
+import { GET_ACTIVE_GAME, INIT_GAME, MOVE, RESUME_GAME } from "./messages.js"
 
 type PendingUser = {
   socket: WebSocket
@@ -127,25 +127,28 @@ export class GameManager{
     if (!userId) return
 
     const game = this.games.get(gameId)
+
+    if (!game || !game.isPlayer(userId)) {
+      socket.send(JSON.stringify({
+        type: "RESUME_FAILED",
+        payload: {},
+      }))
+      return
+    }
+
+    this.reconnectPlayerToGame(gameId, game, userId, socket)
+  }
+
+  private reconnectPlayerToGame(gameId: string, game: Game, userId: number, socket: WebSocket){
+    const didReplacePlayer = game.replacePlayer(userId, socket)
+    if (!didReplacePlayer) return false
+
     const disconnectedPlayers = this.disconnectedPlayers.get(gameId)
+    disconnectedPlayers?.delete(userId)
 
-    if (!game || !disconnectedPlayers?.has(userId)) {
-      socket.send(JSON.stringify({
-        type: "RESUME_FAILED",
-        payload: {},
-      }))
-      return
+    if (disconnectedPlayers?.size === 0) {
+      this.disconnectedPlayers.delete(gameId)
     }
-
-    if (!game.replacePlayer(userId, socket)) {
-      socket.send(JSON.stringify({
-        type: "RESUME_FAILED",
-        payload: {},
-      }))
-      return
-    }
-
-    disconnectedPlayers.delete(userId)
 
     const timer = this.disconnectTimers.get(gameId)
     if (timer) {
@@ -153,9 +156,25 @@ export class GameManager{
       this.disconnectTimers.delete(gameId)
     }
 
-    if (disconnectedPlayers.size === 0) {
-      this.disconnectedPlayers.delete(gameId)
+    return true
+  }
+
+  private sendActiveGame(socket: WebSocket, accessToken: unknown, fallbackUserId: unknown){
+    const userId = this.authenticateSocket(socket, accessToken, fallbackUserId)
+    if (!userId) return
+
+    const entry = Array.from(this.games.entries()).find(([_id, game]) => game.isPlayer(userId))
+
+    if (!entry) {
+      socket.send(JSON.stringify({
+        type: "NO_ACTIVE_GAME",
+        payload: {},
+      }))
+      return
     }
+
+    const [gameId, game] = entry
+    this.reconnectPlayerToGame(gameId, game, userId, socket)
   }
 
   private deleteGame(id: string){
@@ -206,6 +225,14 @@ export class GameManager{
         )
       }
 
+      if(message.type == GET_ACTIVE_GAME){
+        this.sendActiveGame(
+          socket,
+          message.accessToken ?? message.payload?.accessToken,
+          message.userId ?? message.payload?.userId,
+        )
+      }
+
       if(message.type == INIT_GAME){
         const userId = this.authenticateSocket(
           socket,
@@ -213,6 +240,13 @@ export class GameManager{
           message.userId ?? message.payload?.userId,
         )
         if (!userId) return
+
+        const activeGame = Array.from(this.games.entries()).find(([_id, game]) => game.isPlayer(userId))
+        if (activeGame) {
+          const [gameId, game] = activeGame
+          this.reconnectPlayerToGame(gameId, game, userId, socket)
+          return
+        }
 
         if(this.pendingUser){
           const gameId = randomUUID()
