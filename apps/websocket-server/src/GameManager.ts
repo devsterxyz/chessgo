@@ -2,7 +2,7 @@ import type WebSocket from "ws"
 import { randomUUID } from "crypto"
 import jwt from "jsonwebtoken"
 import { Game } from "./Game.js"
-import { GET_ACTIVE_GAME, INIT_GAME, MOVE, RESUME_GAME } from "./messages.js"
+import { CANCEL_MATCHMAKING, GET_ACTIVE_GAME, INIT_GAME, MOVE, RESUME_GAME } from "./messages.js"
 
 type PendingUser = {
   socket: WebSocket
@@ -177,6 +177,23 @@ export class GameManager{
     this.reconnectPlayerToGame(gameId, game, userId, socket)
   }
 
+  private cancelMatchmaking(socket: WebSocket, accessToken: unknown, fallbackUserId: unknown){
+    const userId = this.authenticateSocket(socket, accessToken, fallbackUserId)
+    if (!userId) return
+
+    if (
+      this.pendingUser &&
+      (this.pendingUser.socket === socket || this.pendingUser.userId === userId)
+    ) {
+      this.pendingUser = null
+    }
+
+    socket.send(JSON.stringify({
+      type: "MATCHMAKING_CANCELLED",
+      payload: {},
+    }))
+  }
+
   private deleteGame(id: string){
     const timer = this.disconnectTimers.get(id)
     if (timer) {
@@ -233,6 +250,14 @@ export class GameManager{
         )
       }
 
+      if(message.type == CANCEL_MATCHMAKING){
+        this.cancelMatchmaking(
+          socket,
+          message.accessToken ?? message.payload?.accessToken,
+          message.userId ?? message.payload?.userId,
+        )
+      }
+
       if(message.type == INIT_GAME){
         const userId = this.authenticateSocket(
           socket,
@@ -249,6 +274,15 @@ export class GameManager{
         }
 
         if(this.pendingUser){
+          if (this.pendingUser.userId === userId) {
+            this.pendingUser = { socket, userId }
+            socket.send(JSON.stringify({
+              type: "WAITING_FOR_OPPONENT",
+              payload: {},
+            }))
+            return
+          }
+
           const gameId = randomUUID()
           const game = new Game(gameId, this.pendingUser.socket, socket, this.pendingUser.userId, userId)
           this.games.set(gameId, game)
