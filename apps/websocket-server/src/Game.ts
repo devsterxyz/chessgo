@@ -2,6 +2,15 @@ import { Chess } from "chess.js";
 import type WebSocket from "ws";
 import { GAME_STARTED } from "./messages.js";
 
+type PlayerColor = "white" | "black"
+
+type GameOverPayload = {
+  checkmate?: boolean
+  draw: boolean
+  winner: PlayerColor | null
+  reason?: "checkmate" | "draw" | "timeout"
+}
+
 export class Game{
   public id: string
   public player1: WebSocket
@@ -10,16 +19,32 @@ export class Game{
   public player2Id: number
   public board: Chess
   public moveCount = 0
+  private readonly gameTimeMs = 2 * 60 * 1000
+  private whiteTimeMs = this.gameTimeMs
+  private blackTimeMs = this.gameTimeMs
+  private lastTurnStartedAt = Date.now()
+  private timeoutTimer: NodeJS.Timeout | null = null
+  private gameEnded = false
+  private onGameOver: (gameId: string) => void
 
-  constructor(id: string, player1: WebSocket, player2: WebSocket, player1Id: number, player2Id: number){
+  constructor(
+    id: string,
+    player1: WebSocket,
+    player2: WebSocket,
+    player1Id: number,
+    player2Id: number,
+    onGameOver: (gameId: string) => void,
+  ){
     this.id = id
     this.player1 = player1
     this.player2 = player2
     this.player1Id = player1Id
     this.player2Id = player2Id
+    this.onGameOver = onGameOver
     this.board = new Chess()
     const initialFen = this.board.fen()
     const route = `/game/${this.id}`
+    const clock = this.getClockState()
 
     this.sendToSocket(this.player1, JSON.stringify({
       type: GAME_STARTED,
@@ -28,6 +53,7 @@ export class Game{
         gameId: this.id,
         route,
         fen: initialFen,
+        ...clock,
       }
     }))
     this.sendToSocket(this.player2, JSON.stringify({
@@ -37,8 +63,11 @@ export class Game{
         gameId: this.id,
         route,
         fen: initialFen,
+        ...clock,
       }
     }))
+
+    this.scheduleTurnTimeout()
   }
 
   replacePlayer(userId: number, socket: WebSocket){
@@ -82,6 +111,7 @@ export class Game{
         route: `/game/${this.id}`,
         fen: this.board.fen(),
         moveCount: this.moveCount,
+        ...this.getClockState(),
       }
     }))
   }
@@ -94,11 +124,108 @@ export class Game{
     }
   }
 
+  private getActiveColor(): PlayerColor {
+    return this.board.turn() === "w" ? "white" : "black"
+  }
+
+  private getOpponentColorByColor(color: PlayerColor): PlayerColor {
+    return color === "white" ? "black" : "white"
+  }
+
+  private getClockState() {
+    const now = Date.now()
+    const activeColor = this.getActiveColor()
+    const elapsedMs = this.gameEnded ? 0 : now - this.lastTurnStartedAt
+
+    return {
+      whiteTimeMs: Math.max(
+        0,
+        this.whiteTimeMs - (activeColor === "white" ? elapsedMs : 0),
+      ),
+      blackTimeMs: Math.max(
+        0,
+        this.blackTimeMs - (activeColor === "black" ? elapsedMs : 0),
+      ),
+      activeColor,
+      serverTimeMs: now,
+    }
+  }
+
+  private applyElapsedTime() {
+    const now = Date.now()
+    const elapsedMs = now - this.lastTurnStartedAt
+
+    if (this.getActiveColor() === "white") {
+      this.whiteTimeMs = Math.max(0, this.whiteTimeMs - elapsedMs)
+    } else {
+      this.blackTimeMs = Math.max(0, this.blackTimeMs - elapsedMs)
+    }
+
+    this.lastTurnStartedAt = now
+  }
+
+  private scheduleTurnTimeout() {
+    if (this.timeoutTimer) {
+      clearTimeout(this.timeoutTimer)
+    }
+
+    if (this.gameEnded) return
+
+    const activeColor = this.getActiveColor()
+    const remainingMs = activeColor === "white" ? this.whiteTimeMs : this.blackTimeMs
+
+    this.timeoutTimer = setTimeout(() => {
+      this.expireOnTime(activeColor)
+    }, Math.max(0, remainingMs))
+  }
+
+  private expireOnTime(color: PlayerColor) {
+    if (this.gameEnded || this.getActiveColor() !== color) return
+
+    this.applyElapsedTime()
+    this.endGame({
+      draw: false,
+      winner: this.getOpponentColorByColor(color),
+      reason: "timeout",
+    })
+  }
+
+  private endGame(payload: GameOverPayload) {
+    if (this.gameEnded) return
+
+    this.gameEnded = true
+    if (this.timeoutTimer) {
+      clearTimeout(this.timeoutTimer)
+      this.timeoutTimer = null
+    }
+
+    const gameOverMessage = JSON.stringify({
+      type: "GAME_OVER",
+      payload: {
+        ...payload,
+        ...this.getClockState(),
+      },
+    });
+
+    this.sendToSocket(this.player1, gameOverMessage);
+    this.sendToSocket(this.player2, gameOverMessage);
+    this.onGameOver(this.id)
+  }
+
+  dispose() {
+    if (this.timeoutTimer) {
+      clearTimeout(this.timeoutTimer)
+      this.timeoutTimer = null
+    }
+  }
+
   makeMove(socket: WebSocket, move: {
     from: string
     to: string
     promotion?: "q" | "r" | "b" | "n"
   }){
+    if (this.gameEnded) return false
+
     if(this.moveCount % 2 === 0 && socket !== this.player1){
       console.log("early return 1")
       return false
@@ -110,12 +237,28 @@ export class Game{
     console.log("did not early return")
 
     try {
+      this.applyElapsedTime()
+
+      const activeColor = this.getActiveColor()
+      const activeTimeMs = activeColor === "white" ? this.whiteTimeMs : this.blackTimeMs
+      if (activeTimeMs <= 0) {
+        this.endGame({
+          draw: false,
+          winner: this.getOpponentColorByColor(activeColor),
+          reason: "timeout",
+        })
+        return true
+      }
+
       const result = this.board.move(move);
       if (!result) {
         console.log("Illegal move");
+        this.lastTurnStartedAt = Date.now()
+        this.scheduleTurnTimeout()
         return false;
       }
       this.moveCount++;
+      this.lastTurnStartedAt = Date.now()
 
       // Send the move to both players
       const message = JSON.stringify({
@@ -123,29 +266,29 @@ export class Game{
         payload: {
           move: result,
           fen: this.board.fen(),
+          ...this.getClockState(),
         },
       });
       this.sendToSocket(this.player1, message);
       this.sendToSocket(this.player2, message);
 
         if (this.board.isGameOver()) {
-          const gameOverMessage = JSON.stringify({
-            type: "GAME_OVER",
-            payload: {
-              checkmate: this.board.isCheckmate(),
-              draw: this.board.isDraw(),
-              winner: this.board.isCheckmate()
-              ? this.board.turn() === "w"? "black": "white": null,
-            },
-          });
-
-          this.sendToSocket(this.player1, gameOverMessage);
-          this.sendToSocket(this.player2, gameOverMessage);
+          this.endGame({
+            checkmate: this.board.isCheckmate(),
+            draw: this.board.isDraw(),
+            winner: this.board.isCheckmate()
+            ? this.board.turn() === "w"? "black": "white": null,
+            reason: this.board.isCheckmate() ? "checkmate" : "draw",
+          })
           return true
         }
+
+        this.scheduleTurnTimeout()
       }
       catch (err) {
         console.log("Invalid move:", err);
+        this.lastTurnStartedAt = Date.now()
+        this.scheduleTurnTimeout()
       }
       return false
   }

@@ -195,6 +195,9 @@ export class GameManager{
   }
 
   private deleteGame(id: string){
+    const game = this.games.get(id)
+    game?.dispose()
+
     const timer = this.disconnectTimers.get(id)
     if (timer) {
       clearTimeout(timer)
@@ -284,7 +287,14 @@ export class GameManager{
           }
 
           const gameId = randomUUID()
-          const game = new Game(gameId, this.pendingUser.socket, socket, this.pendingUser.userId, userId)
+          const game = new Game(
+            gameId,
+            this.pendingUser.socket,
+            socket,
+            this.pendingUser.userId,
+            userId,
+            (finishedGameId) => this.deleteGame(finishedGameId),
+          )
           this.games.set(gameId, game)
           this.pendingUser = null
         }
