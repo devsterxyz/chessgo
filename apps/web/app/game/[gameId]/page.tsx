@@ -17,6 +17,7 @@ type ClockState = {
   whiteTimeMs: number
   blackTimeMs: number
   activeColor: PlayerColor
+  drawOfferBy: PlayerColor | null
   receivedAtMs: number
 }
 
@@ -52,6 +53,7 @@ export default function GamePage() {
     whiteTimeMs: 2 * 60 * 1000,
     blackTimeMs: 2 * 60 * 1000,
     activeColor: "white",
+    drawOfferBy: null,
     receivedAtMs: Date.now(),
   })
   const [nowMs, setNowMs] = useState(Date.now())
@@ -70,6 +72,7 @@ export default function GamePage() {
       whiteTimeMs: payload.whiteTimeMs,
       blackTimeMs: payload.blackTimeMs,
       activeColor,
+      drawOfferBy: normalizePlayerColor(payload?.drawOfferBy),
       receivedAtMs: Date.now(),
     })
     setNowMs(Date.now())
@@ -107,11 +110,15 @@ export default function GamePage() {
           setFen(message.payload?.fen ?? message.fen)
           syncClock(message.payload)
           break
+        case "DRAW_OFFER":
+        case "DRAW_DECLINED":
+          syncClock(message.payload)
+          break
         case "GAME_OVER":
           const result = message.payload?.draw
             ? "Draw"
             : message.payload?.winner
-              ? `${message.payload.winner === "white" ? "White" : "Black"} wins${message.payload?.reason === "timeout" ? " on time" : ""}!`
+              ? `${message.payload.winner === "white" ? "White" : "Black"} wins${message.payload?.reason === "timeout" ? " on time" : message.payload?.reason === "resign" ? " by resignation" : ""}!`
               : "Game Over"
           syncClock(message.payload)
           setGameResult(result)
@@ -175,11 +182,49 @@ export default function GamePage() {
     })
   }
 
+  const resignGame = () => {
+    if (gameEnd) return
+
+    sendGameSocketMessage({
+      type: "resign_game",
+    })
+  }
+
+  const drawGame = () => {
+    if (gameEnd) return
+
+    sendGameSocketMessage({
+      type: "draw_offer",
+    })
+  }
+
+  const acceptDraw = () => {
+    if (gameEnd) return
+
+    sendGameSocketMessage({
+      type: "draw_accept",
+    })
+  }
+
+  const declineDraw = () => {
+    if (gameEnd) return
+
+    sendGameSocketMessage({
+      type: "draw_decline",
+    })
+  }
+
   const elapsedMs = gameEnd ? 0 : nowMs - clock.receivedAtMs
   const whiteDisplayMs =
     clock.activeColor === "white" ? clock.whiteTimeMs - elapsedMs : clock.whiteTimeMs
   const blackDisplayMs =
     clock.activeColor === "black" ? clock.blackTimeMs - elapsedMs : clock.blackTimeMs
+  const hasIncomingDrawOffer = Boolean(
+    playerColor && clock.drawOfferBy && clock.drawOfferBy !== playerColor,
+  )
+  const hasOutgoingDrawOffer = Boolean(
+    playerColor && clock.drawOfferBy && clock.drawOfferBy === playerColor,
+  )
 
   return (
     <main className="min-h-screen bg-neutral-950 text-white">
@@ -187,9 +232,13 @@ export default function GamePage() {
       <div className="flex justify-center px-2 py-4 sm:px-4">
         <div className="w-full max-w-5xl">
           <div className="text-center mb-6">
-            <h1 className="text-3xl font-semibold">Game {gameId}</h1>
+            <h1 className="text-3xl font-semibold">Live Game</h1>
             <p className="text-sm text-neutral-400">
-              {connected ? "Connected to game" : "Connecting to game..."}
+              {connected
+                ? playerColor
+                  ? `Playing as ${playerColor === "white" ? "White" : "Black"}`
+                  : "Connected to game"
+                : "Connecting to game..."}
             </p>
           </div>
           <div className="mx-auto mb-4 grid max-w-xl grid-cols-2 overflow-hidden rounded border border-neutral-800 bg-neutral-900">
@@ -206,6 +255,47 @@ export default function GamePage() {
               </p>
             </div>
           </div>
+          <div className="mx-auto mb-4 flex max-w-xl items-center justify-center gap-3">
+            <button
+              type="button"
+              onClick={drawGame}
+              disabled={gameEnd || !connected || hasOutgoingDrawOffer}
+              className="rounded border border-neutral-700 px-5 py-2 text-sm font-semibold text-neutral-100 transition hover:border-emerald-400 hover:text-emerald-300 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {hasOutgoingDrawOffer ? "Draw Offered" : "Offer Draw"}
+            </button>
+            <button
+              type="button"
+              onClick={resignGame}
+              disabled={gameEnd || !connected}
+              className="rounded border border-neutral-700 px-5 py-2 text-sm font-semibold text-neutral-100 transition hover:border-red-400 hover:text-red-300 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Resign
+            </button>
+          </div>
+          {hasIncomingDrawOffer && (
+            <div className="mx-auto mb-4 flex max-w-xl flex-col items-center justify-between gap-3 rounded border border-emerald-800 bg-emerald-950/40 px-4 py-3 text-center sm:flex-row sm:text-left">
+              <p className="text-sm font-medium text-emerald-100">
+                Opponent offered a draw
+              </p>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={acceptDraw}
+                  className="rounded bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-500"
+                >
+                  Accept
+                </button>
+                <button
+                  type="button"
+                  onClick={declineDraw}
+                  className="rounded border border-neutral-600 px-4 py-2 text-sm font-semibold text-neutral-100 transition hover:border-red-400 hover:text-red-300"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
           <div className="flex justify-center">
             <div className="relative">
               <ChessBoard
@@ -219,10 +309,10 @@ export default function GamePage() {
                     <h2 className="mb-3 text-2xl font-semibold">Game Over</h2>
                     <p className="mb-6 text-lg text-slate-300">{gameResult}</p>
                     <button
-                      onClick={() => setGameEnd(false)}
+                      onClick={() => router.push("/play")}
                       className="rounded bg-slate-700 px-6 py-3 font-semibold text-white hover:bg-slate-600"
                     >
-                      Close
+                      Back to Play
                     </button>
                   </div>
                 </div>

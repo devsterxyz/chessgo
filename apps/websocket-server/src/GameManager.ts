@@ -2,7 +2,17 @@ import type WebSocket from "ws"
 import { randomUUID } from "crypto"
 import jwt from "jsonwebtoken"
 import { Game } from "./Game.js"
-import { CANCEL_MATCHMAKING, GET_ACTIVE_GAME, INIT_GAME, MOVE, RESUME_GAME } from "./messages.js"
+import {
+  CANCEL_MATCHMAKING,
+  DRAW_ACCEPT,
+  DRAW_DECLINE,
+  DRAW_OFFER,
+  GET_ACTIVE_GAME,
+  INIT_GAME,
+  MOVE,
+  RESIGN_GAME,
+  RESUME_GAME,
+} from "./messages.js"
 
 type PendingUser = {
   socket: WebSocket
@@ -232,6 +242,15 @@ export class GameManager{
     }
   }
 
+  private getActiveGameForSocket(socket: WebSocket) {
+    const userId = this.socketUserIds.get(socket)
+    if (!userId) return null
+
+    return Array.from(this.games.values()).find(game =>
+      game.isPlayer(userId) && game.getPlayerSocket(userId) === socket
+    ) ?? null
+  }
+
   private addHandler(socket: WebSocket){
     socket.on("message", (data)=>{
       const message = JSON.parse(data.toString())
@@ -308,17 +327,49 @@ export class GameManager{
       }
 
       if(message.type == MOVE){
-        const userId = this.socketUserIds.get(socket)
-        if (!userId) return
-
-        const game = Array.from(this.games.values()).find(game =>
-          game.isPlayer(userId) && game.getPlayerSocket(userId) === socket
-        )
+        const game = this.getActiveGameForSocket(socket)
         if(game){
           const didEndGame = game.makeMove(socket, message.move)
           if (didEndGame) {
             this.deleteGame(game.id)
           }
+        }
+      }
+
+      if(message.type == RESIGN_GAME){
+        const game = this.getActiveGameForSocket(socket)
+        if(game){
+          const didEndGame = game.resign(socket)
+          if (didEndGame) {
+            this.deleteGame(game.id)
+          }
+        }
+      }
+
+      if(message.type == DRAW_OFFER){
+        const game = this.getActiveGameForSocket(socket)
+        if(game){
+          const didEndGame = game.offerDraw(socket)
+          if (didEndGame) {
+            this.deleteGame(game.id)
+          }
+        }
+      }
+
+      if(message.type == DRAW_ACCEPT){
+        const game = this.getActiveGameForSocket(socket)
+        if(game){
+          const didEndGame = game.acceptDraw(socket)
+          if (didEndGame) {
+            this.deleteGame(game.id)
+          }
+        }
+      }
+
+      if(message.type == DRAW_DECLINE){
+        const game = this.getActiveGameForSocket(socket)
+        if(game){
+          game.declineDraw(socket)
         }
       }
     })

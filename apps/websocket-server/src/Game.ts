@@ -8,7 +8,7 @@ type GameOverPayload = {
   checkmate?: boolean
   draw: boolean
   winner: PlayerColor | null
-  reason?: "checkmate" | "draw" | "timeout"
+  reason?: "checkmate" | "draw" | "timeout" | "resign"
 }
 
 export class Game{
@@ -25,6 +25,7 @@ export class Game{
   private lastTurnStartedAt = Date.now()
   private timeoutTimer: NodeJS.Timeout | null = null
   private gameEnded = false
+  private pendingDrawOfferBy: PlayerColor | null = null
   private onGameOver: (gameId: string) => void
 
   constructor(
@@ -102,6 +103,12 @@ export class Game{
     return null
   }
 
+  getPlayerColorBySocket(socket: WebSocket): PlayerColor | null {
+    if (socket === this.player1) return "white"
+    if (socket === this.player2) return "black"
+    return null
+  }
+
   private sendState(socket: WebSocket, color: "white" | "black"){
     this.sendToSocket(socket, JSON.stringify({
       type: GAME_STARTED,
@@ -147,6 +154,7 @@ export class Game{
         this.blackTimeMs - (activeColor === "black" ? elapsedMs : 0),
       ),
       activeColor,
+      drawOfferBy: this.pendingDrawOfferBy,
       serverTimeMs: now,
     }
   }
@@ -193,7 +201,9 @@ export class Game{
   private endGame(payload: GameOverPayload) {
     if (this.gameEnded) return
 
+    this.applyElapsedTime()
     this.gameEnded = true
+    this.pendingDrawOfferBy = null
     if (this.timeoutTimer) {
       clearTimeout(this.timeoutTimer)
       this.timeoutTimer = null
@@ -212,11 +222,86 @@ export class Game{
     this.onGameOver(this.id)
   }
 
+  private sendDrawMessage(type: string, payload: Record<string, unknown>) {
+    const message = JSON.stringify({
+      type,
+      payload: {
+        ...payload,
+        ...this.getClockState(),
+      },
+    })
+
+    this.sendToSocket(this.player1, message)
+    this.sendToSocket(this.player2, message)
+  }
+
   dispose() {
     if (this.timeoutTimer) {
       clearTimeout(this.timeoutTimer)
       this.timeoutTimer = null
     }
+  }
+
+  resign(socket: WebSocket) {
+    if (this.gameEnded) return false
+
+    const resigningColor = this.getPlayerColorBySocket(socket)
+    if (!resigningColor) return false
+
+    this.endGame({
+      draw: false,
+      winner: this.getOpponentColorByColor(resigningColor),
+      reason: "resign",
+    })
+    return true
+  }
+
+  offerDraw(socket: WebSocket) {
+    if (this.gameEnded) return false
+
+    const offeringColor = this.getPlayerColorBySocket(socket)
+    if (!offeringColor) return false
+
+    if (this.pendingDrawOfferBy === this.getOpponentColorByColor(offeringColor)) {
+      return this.acceptDraw(socket)
+    }
+
+    this.pendingDrawOfferBy = offeringColor
+    this.sendDrawMessage("DRAW_OFFER", {
+      offeredBy: offeringColor,
+    })
+    return false
+  }
+
+  acceptDraw(socket: WebSocket) {
+    if (this.gameEnded) return false
+
+    const acceptingColor = this.getPlayerColorBySocket(socket)
+    if (!acceptingColor || !this.pendingDrawOfferBy) return false
+    if (this.pendingDrawOfferBy === acceptingColor) return false
+
+    this.endGame({
+      draw: true,
+      winner: null,
+      reason: "draw",
+    })
+    return true
+  }
+
+  declineDraw(socket: WebSocket) {
+    if (this.gameEnded) return false
+
+    const decliningColor = this.getPlayerColorBySocket(socket)
+    if (!decliningColor || !this.pendingDrawOfferBy) return false
+    if (this.pendingDrawOfferBy === decliningColor) return false
+
+    const offeredBy = this.pendingDrawOfferBy
+    this.pendingDrawOfferBy = null
+    this.sendDrawMessage("DRAW_DECLINED", {
+      offeredBy,
+      declinedBy: decliningColor,
+    })
+    return false
   }
 
   makeMove(socket: WebSocket, move: {
@@ -258,6 +343,7 @@ export class Game{
         return false;
       }
       this.moveCount++;
+      this.pendingDrawOfferBy = null
       this.lastTurnStartedAt = Date.now()
 
       // Send the move to both players
