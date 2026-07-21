@@ -11,6 +11,13 @@ type GameOverPayload = {
   reason?: "checkmate" | "draw" | "timeout" | "resign"
 }
 
+export type TimeControl = {
+  id: string
+  label: string
+  initialTimeMs: number
+  incrementMs: number
+}
+
 export class Game{
   public id: string
   public player1: WebSocket
@@ -19,9 +26,8 @@ export class Game{
   public player2Id: number
   public board: Chess
   public moveCount = 0
-  private readonly gameTimeMs = 2 * 60 * 1000
-  private whiteTimeMs = this.gameTimeMs
-  private blackTimeMs = this.gameTimeMs
+  private whiteTimeMs: number
+  private blackTimeMs: number
   private lastTurnStartedAt = Date.now()
   private timeoutTimer: NodeJS.Timeout | null = null
   private gameEnded = false
@@ -34,6 +40,7 @@ export class Game{
     player2: WebSocket,
     player1Id: number,
     player2Id: number,
+    private readonly timeControl: TimeControl,
     onGameOver: (gameId: string) => void,
   ){
     this.id = id
@@ -42,6 +49,8 @@ export class Game{
     this.player1Id = player1Id
     this.player2Id = player2Id
     this.onGameOver = onGameOver
+    this.whiteTimeMs = timeControl.initialTimeMs
+    this.blackTimeMs = timeControl.initialTimeMs
     this.board = new Chess()
     const initialFen = this.board.fen()
     const route = `/game/${this.id}`
@@ -54,6 +63,7 @@ export class Game{
         gameId: this.id,
         route,
         fen: initialFen,
+        timeControl,
         ...clock,
       }
     }))
@@ -64,6 +74,7 @@ export class Game{
         gameId: this.id,
         route,
         fen: initialFen,
+        timeControl,
         ...clock,
       }
     }))
@@ -118,6 +129,7 @@ export class Game{
         route: `/game/${this.id}`,
         fen: this.board.fen(),
         moveCount: this.moveCount,
+        timeControl: this.timeControl,
         ...this.getClockState(),
       }
     }))
@@ -341,6 +353,11 @@ export class Game{
         this.lastTurnStartedAt = Date.now()
         this.scheduleTurnTimeout()
         return false;
+      }
+      if (activeColor === "white") {
+        this.whiteTimeMs += this.timeControl.incrementMs
+      } else {
+        this.blackTimeMs += this.timeControl.incrementMs
       }
       this.moveCount++;
       this.pendingDrawOfferBy = null

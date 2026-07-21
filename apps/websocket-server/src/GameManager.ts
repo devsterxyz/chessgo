@@ -1,7 +1,7 @@
 import type WebSocket from "ws"
 import { randomUUID } from "crypto"
 import jwt from "jsonwebtoken"
-import { Game } from "./Game.js"
+import { Game, type TimeControl } from "./Game.js"
 import {
   CANCEL_MATCHMAKING,
   DRAW_ACCEPT,
@@ -17,11 +17,30 @@ import {
 type PendingUser = {
   socket: WebSocket
   userId: number
+  timeControl: TimeControl
+  rated: boolean
 }
+
+const timeControls: Record<string, TimeControl> = {
+  "1+0": { id: "1+0", label: "1 min", initialTimeMs: 1 * 60 * 1000, incrementMs: 0 },
+  "1+1": { id: "1+1", label: "1 + 1", initialTimeMs: 1 * 60 * 1000, incrementMs: 1 * 1000 },
+  "2+1": { id: "2+1", label: "2 + 1", initialTimeMs: 2 * 60 * 1000, incrementMs: 1 * 1000 },
+  "3+0": { id: "3+0", label: "3 min", initialTimeMs: 3 * 60 * 1000, incrementMs: 0 },
+  "3+2": { id: "3+2", label: "3 + 2", initialTimeMs: 3 * 60 * 1000, incrementMs: 2 * 1000 },
+  "5+0": { id: "5+0", label: "5 min", initialTimeMs: 5 * 60 * 1000, incrementMs: 0 },
+  "10+0": { id: "10+0", label: "10 min", initialTimeMs: 10 * 60 * 1000, incrementMs: 0 },
+  "10+5": { id: "10+5", label: "10 + 5", initialTimeMs: 10 * 60 * 1000, incrementMs: 5 * 1000 },
+  "15+10": { id: "15+10", label: "15 + 10", initialTimeMs: 15 * 60 * 1000, incrementMs: 10 * 1000 },
+  "1d+0": { id: "1d+0", label: "1 day", initialTimeMs: 24 * 60 * 60 * 1000, incrementMs: 0 },
+  "3d+0": { id: "3d+0", label: "3 days", initialTimeMs: 3 * 24 * 60 * 60 * 1000, incrementMs: 0 },
+  "7d+0": { id: "7d+0", label: "7 days", initialTimeMs: 7 * 24 * 60 * 60 * 1000, incrementMs: 0 },
+}
+
+const defaultTimeControl = timeControls["5+0"]!
 
 export class GameManager{
   private games: Map<string, Game>
-  private pendingUser: PendingUser | null
+  private pendingUsers: Map<string, PendingUser>
   private users: WebSocket[]
   private socketUserIds: Map<WebSocket, number>
   private disconnectedPlayers: Map<string, Set<number>>
@@ -30,7 +49,7 @@ export class GameManager{
 
   constructor(){
     this.games = new Map()
-    this.pendingUser = null
+    this.pendingUsers = new Map()
     this.users = []
     this.socketUserIds = new Map()
     this.disconnectedPlayers = new Map()
@@ -47,8 +66,10 @@ export class GameManager{
     const userId = this.socketUserIds.get(socket)
     this.socketUserIds.delete(socket)
 
-    if (this.pendingUser?.socket === socket) {
-      this.pendingUser = null
+    for (const [timeControlId, pendingUser] of this.pendingUsers.entries()) {
+      if (pendingUser.socket === socket) {
+        this.pendingUsers.delete(timeControlId)
+      }
     }
 
     if (!userId) return
@@ -130,6 +151,15 @@ export class GameManager{
     return userId
   }
 
+  private getTimeControl(timeControlId: unknown): TimeControl {
+    if (typeof timeControlId !== "string") return defaultTimeControl
+    return timeControls[timeControlId] ?? defaultTimeControl
+  }
+
+  private getMatchmakingKey(timeControlId: string, rated: boolean) {
+    return `${timeControlId}:${rated ? "rated" : "casual"}`
+  }
+
   private resumeGame(socket: WebSocket, gameId: unknown, accessToken: unknown, fallbackUserId: unknown){
     if (typeof gameId !== "string") return
 
@@ -191,11 +221,10 @@ export class GameManager{
     const userId = this.authenticateSocket(socket, accessToken, fallbackUserId)
     if (!userId) return
 
-    if (
-      this.pendingUser &&
-      (this.pendingUser.socket === socket || this.pendingUser.userId === userId)
-    ) {
-      this.pendingUser = null
+    for (const [matchmakingKey, pendingUser] of this.pendingUsers.entries()) {
+      if (pendingUser.socket === socket || pendingUser.userId === userId) {
+        this.pendingUsers.delete(matchmakingKey)
+      }
     }
 
     socket.send(JSON.stringify({
@@ -287,6 +316,9 @@ export class GameManager{
           message.userId ?? message.payload?.userId,
         )
         if (!userId) return
+        const timeControl = this.getTimeControl(message.timeControlId ?? message.payload?.timeControlId)
+        const rated = Boolean(message.rated ?? message.payload?.rated)
+        const matchmakingKey = this.getMatchmakingKey(timeControl.id, rated)
 
         const activeGame = Array.from(this.games.entries()).find(([_id, game]) => game.isPlayer(userId))
         if (activeGame) {
@@ -295,12 +327,16 @@ export class GameManager{
           return
         }
 
-        if(this.pendingUser){
-          if (this.pendingUser.userId === userId) {
-            this.pendingUser = { socket, userId }
+        const pendingUser = this.pendingUsers.get(matchmakingKey)
+        if(pendingUser){
+          if (pendingUser.userId === userId) {
+            this.pendingUsers.set(matchmakingKey, { socket, userId, timeControl, rated })
             socket.send(JSON.stringify({
               type: "WAITING_FOR_OPPONENT",
-              payload: {},
+              payload: {
+                timeControl,
+                rated,
+              },
             }))
             return
           }
@@ -308,20 +344,24 @@ export class GameManager{
           const gameId = randomUUID()
           const game = new Game(
             gameId,
-            this.pendingUser.socket,
+            pendingUser.socket,
             socket,
-            this.pendingUser.userId,
+            pendingUser.userId,
             userId,
+            timeControl,
             (finishedGameId) => this.deleteGame(finishedGameId),
           )
           this.games.set(gameId, game)
-          this.pendingUser = null
+          this.pendingUsers.delete(matchmakingKey)
         }
         else{
-          this.pendingUser = { socket, userId }
+          this.pendingUsers.set(matchmakingKey, { socket, userId, timeControl, rated })
           socket.send(JSON.stringify({
             type: "WAITING_FOR_OPPONENT",
-            payload: {},
+            payload: {
+              timeControl,
+              rated,
+            },
           }))
         }
       }

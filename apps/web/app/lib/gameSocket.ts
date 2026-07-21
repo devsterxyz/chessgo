@@ -2,14 +2,22 @@
 
 let socket: WebSocket | null = null
 let messageListener: ((message: any) => void) | null = null
+let statusListener: ((status: "connecting" | "open" | "closed" | "unavailable") => void) | null = null
 let lastGameStartedMessage: any = null
+
+const GAME_SOCKET_URL = process.env.NEXT_PUBLIC_WS_URL ?? "ws://localhost:8081"
 
 export function createGameSocket() {
   if (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) {
     return socket
   }
 
-  socket = new WebSocket("ws://localhost:8080")
+  statusListener?.("connecting")
+  socket = new WebSocket(GAME_SOCKET_URL)
+
+  socket.addEventListener("open", () => {
+    statusListener?.("open")
+  })
 
   socket.addEventListener("message", (event) => {
     try {
@@ -25,10 +33,11 @@ export function createGameSocket() {
 
   socket.addEventListener("close", () => {
     socket = null
+    statusListener?.("closed")
   })
 
-  socket.addEventListener("error", (event) => {
-    console.error("WebSocket error", event)
+  socket.addEventListener("error", () => {
+    statusListener?.("unavailable")
   })
 
   return socket
@@ -54,10 +63,15 @@ export function setGameSocketListener(listener: ((message: any) => void) | null)
   messageListener = listener
 }
 
+export function setGameSocketStatusListener(listener: ((status: "connecting" | "open" | "closed" | "unavailable") => void) | null) {
+  statusListener = listener
+}
+
 export function closeGameSocket() {
   if (!socket) return
   socket.close()
   socket = null
   messageListener = null
+  statusListener = null
   lastGameStartedMessage = null
 }

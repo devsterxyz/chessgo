@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import type { FormEvent } from "react";
 import { useState } from "react";
 
-const API_BASE_URL = "http://localhost:3002";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3012";
 
 export function AuthForm() {
   const router = useRouter();
