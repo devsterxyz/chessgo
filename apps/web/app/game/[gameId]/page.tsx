@@ -1,6 +1,6 @@
 "use client";
 import Image from "next/image";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ChessBoard } from "@repo/ui/ChessBoard";
 import { Chess } from "chess.js";
@@ -102,6 +102,12 @@ export default function GamePage() {
   const [positionIndex, setPositionIndex] = useState(0);
   const [moveHistory, setMoveHistory] = useState<MoveRecord[]>([]);
   const [playerColor, setPlayerColor] = useState<PlayerColor | null>(null);
+  const positionHistoryRef = useRef<string[]>([STARTING_FEN]);
+  const moveHistoryRef = useRef<MoveRecord[]>([]);
+  const lastAppliedMoveRef = useRef<{
+    fen: string;
+    label: string | null;
+  } | null>(null);
   const [connected, setConnected] = useState(false);
   const [gameEnd, setGameEnd] = useState(false);
   const [gameResult, setGameResult] = useState("Game Over");
@@ -160,37 +166,74 @@ export default function GamePage() {
         positions.length > 0 && positions.length === moves.length + 1
           ? positions
           : [nextFen];
-      const nextMoves =
-        nextPositions.length === moves.length + 1 ? moves : [];
+      const nextMoves = nextPositions.length === moves.length + 1 ? moves : [];
 
       setFen(nextFen);
       setPositionHistory(nextPositions);
       setPositionIndex(nextPositions.length - 1);
       setMoveHistory(nextMoves);
+      positionHistoryRef.current = nextPositions;
+      moveHistoryRef.current = nextMoves;
+      lastAppliedMoveRef.current = {
+        fen: nextPositions[nextPositions.length - 1] ?? nextFen,
+        label: nextMoves[nextMoves.length - 1]?.label ?? null,
+      };
     },
     [],
   );
 
-  const addLivePosition = useCallback(
-    (nextFen: string, move: unknown) => {
-      setFen(nextFen);
-      setPositionHistory((history) => {
-        if (history[history.length - 1] === nextFen) {
-          setPositionIndex(history.length - 1);
-          return history;
+  const addLivePosition = useCallback((nextFen: string, move: unknown) => {
+    const nextMoveLabel = getMoveLabel(move);
+    const previousAppliedMove = lastAppliedMoveRef.current;
+
+    if (
+      previousAppliedMove &&
+      previousAppliedMove.fen === nextFen &&
+      previousAppliedMove.label === nextMoveLabel
+    ) {
+      return;
+    }
+
+    setFen(nextFen);
+    setPositionHistory((history) => {
+      if (history[history.length - 1] === nextFen) {
+        setPositionIndex(history.length - 1);
+        lastAppliedMoveRef.current = {
+          fen: nextFen,
+          label: nextMoveLabel,
+        };
+        return history;
+      }
+
+      const nextHistory = [...history, nextFen];
+      setMoveHistory((moves) => {
+        const lastMoveLabel = moves[moves.length - 1]?.label;
+        if (lastMoveLabel === nextMoveLabel) {
+          lastAppliedMoveRef.current = {
+            fen: nextFen,
+            label: nextMoveLabel,
+          };
+          return moves;
         }
 
-        const nextHistory = [...history, nextFen];
-        setMoveHistory((moves) => [
-          ...moves,
-          { label: getMoveLabel(move) },
-        ]);
-        setPositionIndex(nextHistory.length - 1);
-        return nextHistory;
+        const nextMoves = [...moves, { label: nextMoveLabel }];
+        moveHistoryRef.current = nextMoves;
+        return nextMoves;
       });
-    },
-    [],
-  );
+      setPositionIndex(nextHistory.length - 1);
+      positionHistoryRef.current = nextHistory;
+      lastAppliedMoveRef.current = {
+        fen: nextFen,
+        label: nextMoveLabel,
+      };
+      return nextHistory;
+    });
+  }, []);
+
+  useEffect(() => {
+    positionHistoryRef.current = positionHistory;
+    moveHistoryRef.current = moveHistory;
+  }, [moveHistory, positionHistory]);
 
   useEffect(() => {
     const ws = createGameSocket();
@@ -386,8 +429,19 @@ export default function GamePage() {
   };
 
   const showNextPosition = () => {
-    setPositionIndex((index) => Math.min(positionHistory.length - 1, index + 1));
+    setPositionIndex((index) =>
+      Math.min(positionHistory.length - 1, index + 1),
+    );
   };
+
+  const showStartingPosition = () => {
+    setPositionIndex(0);
+  };
+
+  const showLatestPosition = () => {
+    setPositionIndex(positionHistory.length - 1);
+  };
+
   const movePairs = Array.from(
     { length: Math.ceil(moveHistory.length / 2) },
     (_, index) => ({
@@ -494,26 +548,6 @@ export default function GamePage() {
             </p>
 
             <div className="mt-6 grid gap-3">
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  type="button"
-                  onClick={showPreviousPosition}
-                  disabled={!canGoBack}
-                  aria-label="Show previous move"
-                  className="h-12 rounded-xl border border-neutral-200 bg-white px-5 text-xl font-extrabold text-neutral-700 transition hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  ←
-                </button>
-                <button
-                  type="button"
-                  onClick={showNextPosition}
-                  disabled={!canGoForward}
-                  aria-label="Show next move"
-                  className="h-12 rounded-xl border border-neutral-200 bg-white px-5 text-xl font-extrabold text-neutral-700 transition hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  →
-                </button>
-              </div>
               <button
                 type="button"
                 onClick={drawGame}
@@ -556,28 +590,34 @@ export default function GamePage() {
               </div>
             )}
 
-            <div className="mt-8 rounded-xl bg-[#f7f5f0] px-4 py-4 text-sm text-neutral-600">
-              <div className="flex items-center justify-between gap-3">
-                <p className="font-semibold text-neutral-900">Moves</p>
-                <p className="text-xs font-semibold text-neutral-500">
-                  {gameEnd
-                    ? gameResult
-                    : !isViewingLatest
-                      ? `${positionIndex}/${positionHistory.length - 1}`
-                      : connected
-                        ? "Live"
-                        : "Connecting"}
-                </p>
+            <div className="mt-8 overflow-hidden rounded-xl border border-neutral-200 bg-white text-sm text-neutral-700 shadow-lg shadow-neutral-200/70">
+              <div className="flex items-center justify-between border-b border-neutral-200 bg-[#faf8f3] px-4 py-3">
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-700">
+                    Move History
+                  </p>
+                  <p className="text-sm font-bold text-neutral-900">
+                    Review the game
+                  </p>
+                </div>
               </div>
 
-              {movePairs.length > 0 ? (
-                <div className="mt-3 max-h-64 overflow-y-auto rounded-lg border border-neutral-200 bg-white">
-                  {movePairs.map((pair) => (
+              <div className="grid grid-cols-[3rem_1fr_1fr] border-b border-neutral-200 bg-neutral-50">
+                <p className="px-3 py-3 text-xs font-bold text-neutral-500">
+                  #
+                </p>
+                <p className="px-3 py-3 font-bold text-neutral-900">White</p>
+                <p className="px-3 py-3 font-bold text-neutral-900">Black</p>
+              </div>
+
+              <div className="min-h-64 max-h-80 overflow-y-auto bg-white">
+                {movePairs.length > 0 ? (
+                  movePairs.map((pair) => (
                     <div
                       key={pair.moveNumber}
-                      className="grid grid-cols-[3rem_1fr_1fr] border-b border-neutral-100 last:border-b-0"
+                      className="grid grid-cols-[3rem_1fr_1fr] border-b border-neutral-100 odd:bg-neutral-50"
                     >
-                      <div className="bg-neutral-50 px-3 py-2 text-xs font-bold text-neutral-500">
+                      <div className="px-3 py-2 text-xs font-bold text-neutral-500">
                         {pair.moveNumber}.
                       </div>
                       <button
@@ -607,15 +647,65 @@ export default function GamePage() {
                         <div className="px-3 py-2 text-neutral-400">...</div>
                       )}
                     </div>
-                  ))}
+                  ))
+                ) : (
+                  <p className="px-3 py-4 text-neutral-500">
+                    {connected
+                      ? "No moves played yet."
+                      : "Waiting for connection."}
+                  </p>
+                )}
+              </div>
+
+              <div className="border-t border-neutral-200 bg-[#faf8f3] px-2 py-2">
+                <div className="grid grid-cols-4 gap-2">
+                  <button
+                    type="button"
+                    onClick={showStartingPosition}
+                    disabled={!canGoBack}
+                    aria-label="Show starting position"
+                    className="h-12 rounded-lg bg-white text-lg font-extrabold text-neutral-700 transition hover:bg-neutral-100 hover:text-neutral-900 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    |&lt;
+                  </button>
+                  <button
+                    type="button"
+                    onClick={showPreviousPosition}
+                    disabled={!canGoBack}
+                    aria-label="Show previous move"
+                    className="h-12 rounded-lg bg-white text-lg font-extrabold text-neutral-700 transition hover:bg-neutral-100 hover:text-neutral-900 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    &lt;
+                  </button>
+                  <button
+                    type="button"
+                    onClick={showNextPosition}
+                    disabled={!canGoForward}
+                    aria-label="Show next move"
+                    className="h-12 rounded-lg bg-white text-lg font-extrabold text-neutral-700 transition hover:bg-neutral-100 hover:text-neutral-900 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    &gt;
+                  </button>
+                  <button
+                    type="button"
+                    onClick={showLatestPosition}
+                    disabled={!canGoForward}
+                    aria-label="Show latest position"
+                    className="h-12 rounded-lg bg-white text-lg font-extrabold text-neutral-700 transition hover:bg-neutral-100 hover:text-neutral-900 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    &gt;|
+                  </button>
                 </div>
-              ) : (
-                <p className="mt-3 rounded-lg border border-neutral-200 bg-white px-3 py-3">
-                  {connected
-                    ? "No moves played yet."
-                    : "Waiting for connection."}
+                <p className="mt-2 text-xs font-semibold text-neutral-500">
+                  {gameEnd
+                    ? gameResult
+                    : !isViewingLatest
+                      ? `${positionIndex}/${positionHistory.length - 1}`
+                      : connected
+                        ? "Live"
+                        : "Connecting"}
                 </p>
-              )}
+              </div>
             </div>
           </div>
         </aside>
