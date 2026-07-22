@@ -1,19 +1,27 @@
-"use client"
-type ButtonProps = {
-  children: any,
-  onclick?: any,
-  disabled?: boolean
-}
+"use client";
 
-export const Button = ({ children, onclick, disabled = false }: ButtonProps) => {
+import type { MouseEventHandler, ReactNode } from "react";
+
+type ButtonProps = {
+  children: ReactNode;
+  onclick?: MouseEventHandler<HTMLButtonElement>;
+  disabled?: boolean;
+};
+
+export const Button = ({
+  children,
+  onclick,
+  disabled = false,
+}: ButtonProps) => {
   return (
     <button
       onClick={onclick}
       disabled={disabled}
-      className='px-8 py-4 text-2xl bg-blue-500 hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-neutral-700 disabled:text-neutral-300 text-white font-bold rounded'>
+      className="rounded-xl bg-emerald-600 px-7 py-3 text-base font-extrabold text-white shadow-lg shadow-emerald-200 transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:bg-neutral-300 disabled:text-neutral-500 disabled:shadow-none"
+    >
       {children}
     </button>
-  )
-}
+  );
+};
 
-export default Button
+export default Button;

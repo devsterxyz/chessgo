@@ -2,40 +2,46 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { closeGameSocket } from "./lib/gameSocket";
 
 type StoredUser = {
   username?: string;
 };
 
+function subscribeToStoredUser(onStoreChange: () => void) {
+  window.addEventListener("storage", onStoreChange);
+  return () => window.removeEventListener("storage", onStoreChange);
+}
+
+function getStoredUsername() {
+  const storedUser = localStorage.getItem("chessgo_user");
+
+  if (!storedUser) {
+    return "Player";
+  }
+
+  try {
+    const user = JSON.parse(storedUser) as StoredUser;
+    return user.username?.trim() || "Player";
+  } catch {
+    return "Player";
+  }
+}
+
 export function Navbar() {
   const router = useRouter();
   const menuRef = useRef<HTMLDivElement | null>(null);
-  const [username, setUsername] = useState("Player");
+  const username = useSyncExternalStore(
+    subscribeToStoredUser,
+    getStoredUsername,
+    () => "Player",
+  );
   const [isProfileOpen, setIsProfileOpen] = useState(false);
 
   useEffect(() => {
-    const storedUser = localStorage.getItem("chessgo_user");
-
-    if (!storedUser) {
-      return;
-    }
-
-    try {
-      const user = JSON.parse(storedUser) as StoredUser;
-      setUsername(user.username?.trim() || "Player");
-    } catch {
-      setUsername("Player");
-    }
-  }, []);
-
-  useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (
-        menuRef.current &&
-        !menuRef.current.contains(event.target as Node)
-      ) {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
         setIsProfileOpen(false);
       }
     };
@@ -54,17 +60,17 @@ export function Navbar() {
   };
 
   return (
-    <nav className="border-b border-neutral-800 bg-neutral-950 px-4 text-white">
-      <div className="mx-auto flex h-16 max-w-screen-lg items-center justify-between">
+    <nav className="border-b border-neutral-200 bg-white px-4 text-neutral-950 shadow-sm shadow-neutral-200/60">
+      <div className="mx-auto flex h-16 max-w-[1180px] items-center justify-between">
         <Link href="/play" onClick={closeGameSocket}>
-          <h1 className="text-xl font-bold">ChessGo</h1>
+          <h1 className="text-xl font-extrabold">ChessGo</h1>
         </Link>
 
         <div ref={menuRef} className="relative">
           <button
             type="button"
             onClick={() => setIsProfileOpen((isOpen) => !isOpen)}
-            className="rounded-md border border-neutral-700 px-4 py-2 text-sm font-semibold transition hover:border-emerald-400 hover:text-emerald-300"
+            className="rounded-lg border border-neutral-200 bg-white px-4 py-2 text-sm font-bold text-neutral-700 transition hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700"
             aria-expanded={isProfileOpen}
             aria-haspopup="menu"
           >
@@ -73,16 +79,16 @@ export function Navbar() {
 
           {isProfileOpen ? (
             <div
-              className="absolute right-0 z-10 mt-2 w-56 rounded-md border border-neutral-800 bg-neutral-900 p-3 shadow-xl"
+              className="absolute right-0 z-10 mt-2 w-56 rounded-xl border border-neutral-200 bg-white p-3 shadow-xl shadow-neutral-200/70"
               role="menu"
             >
-              <p className="truncate text-sm font-medium text-neutral-100">
+              <p className="truncate text-sm font-bold text-neutral-950">
                 {username}
               </p>
               <button
                 type="button"
                 onClick={handleLogout}
-                className="mt-3 w-full rounded-md bg-red-500 px-3 py-2 text-sm font-semibold text-white transition hover:bg-red-400"
+                className="mt-3 w-full rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-bold text-red-600 transition hover:border-red-300 hover:bg-red-100"
                 role="menuitem"
               >
                 Logout

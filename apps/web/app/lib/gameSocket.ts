@@ -1,77 +1,96 @@
-"use client"
+"use client";
 
-let socket: WebSocket | null = null
-let messageListener: ((message: any) => void) | null = null
-let statusListener: ((status: "connecting" | "open" | "closed" | "unavailable") => void) | null = null
-let lastGameStartedMessage: any = null
+export type GameSocketMessage = {
+  type?: string;
+  payload?: Record<string, unknown>;
+  [key: string]: unknown;
+};
 
-const GAME_SOCKET_URL = process.env.NEXT_PUBLIC_WS_URL ?? "ws://localhost:8081"
+type GameSocketStatus = "connecting" | "open" | "closed" | "unavailable";
+
+let socket: WebSocket | null = null;
+let messageListener: ((message: GameSocketMessage) => void) | null = null;
+let statusListener: ((status: GameSocketStatus) => void) | null = null;
+let lastGameStartedMessage: GameSocketMessage | null = null;
+
+const GAME_SOCKET_URL = process.env.NEXT_PUBLIC_WS_URL ?? "ws://localhost:8081";
 
 export function createGameSocket() {
-  if (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) {
-    return socket
+  if (
+    socket &&
+    (socket.readyState === WebSocket.OPEN ||
+      socket.readyState === WebSocket.CONNECTING)
+  ) {
+    return socket;
   }
 
-  statusListener?.("connecting")
-  socket = new WebSocket(GAME_SOCKET_URL)
+  statusListener?.("connecting");
+  socket = new WebSocket(GAME_SOCKET_URL);
 
   socket.addEventListener("open", () => {
-    statusListener?.("open")
-  })
+    statusListener?.("open");
+  });
 
   socket.addEventListener("message", (event) => {
     try {
-      const message = JSON.parse(event.data)
-      if (message?.type === "game_started" || message?.type === "GAME_STARTED") {
-        lastGameStartedMessage = message
+      const message = JSON.parse(event.data) as GameSocketMessage;
+      if (
+        message?.type === "game_started" ||
+        message?.type === "GAME_STARTED"
+      ) {
+        lastGameStartedMessage = message;
       }
-      messageListener?.(message)
+      messageListener?.(message);
     } catch (error) {
-      console.error("Failed to parse socket message", error)
+      console.error("Failed to parse socket message", error);
     }
-  })
+  });
 
   socket.addEventListener("close", () => {
-    socket = null
-    statusListener?.("closed")
-  })
+    socket = null;
+    statusListener?.("closed");
+  });
 
   socket.addEventListener("error", () => {
-    statusListener?.("unavailable")
-  })
+    statusListener?.("unavailable");
+  });
 
-  return socket
+  return socket;
 }
 
 export function getGameSocket() {
-  return socket
+  return socket;
 }
 
 export function getLastGameStartedMessage() {
-  return lastGameStartedMessage
+  return lastGameStartedMessage;
 }
 
-export function sendGameSocketMessage(message: any) {
+export function sendGameSocketMessage(message: GameSocketMessage) {
   if (!socket || socket.readyState !== WebSocket.OPEN) {
-    return
+    return;
   }
 
-  socket.send(JSON.stringify(message))
+  socket.send(JSON.stringify(message));
 }
 
-export function setGameSocketListener(listener: ((message: any) => void) | null) {
-  messageListener = listener
+export function setGameSocketListener(
+  listener: ((message: GameSocketMessage) => void) | null,
+) {
+  messageListener = listener;
 }
 
-export function setGameSocketStatusListener(listener: ((status: "connecting" | "open" | "closed" | "unavailable") => void) | null) {
-  statusListener = listener
+export function setGameSocketStatusListener(
+  listener: ((status: GameSocketStatus) => void) | null,
+) {
+  statusListener = listener;
 }
 
 export function closeGameSocket() {
-  if (!socket) return
-  socket.close()
-  socket = null
-  messageListener = null
-  statusListener = null
-  lastGameStartedMessage = null
+  if (!socket) return;
+  socket.close();
+  socket = null;
+  messageListener = null;
+  statusListener = null;
+  lastGameStartedMessage = null;
 }
