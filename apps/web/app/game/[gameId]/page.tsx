@@ -34,6 +34,12 @@ type StoredUser = {
   username?: string;
 };
 
+type MoveRecord = {
+  label: string;
+};
+
+const STARTING_FEN = new Chess().fen();
+
 function getPayload(message: GameSocketMessage): Record<string, unknown> {
   return message.payload ?? {};
 }
@@ -52,6 +58,34 @@ function formatClock(ms: number) {
   return `${minutes}:${seconds.toString().padStart(2, "0")}`;
 }
 
+function getMoveLabel(move: unknown) {
+  if (!move || typeof move !== "object") return "Move";
+
+  const moveRecord = move as Record<string, unknown>;
+  if (typeof moveRecord.san === "string") return moveRecord.san;
+
+  const from = typeof moveRecord.from === "string" ? moveRecord.from : "";
+  const to = typeof moveRecord.to === "string" ? moveRecord.to : "";
+  const promotion =
+    typeof moveRecord.promotion === "string" ? `=${moveRecord.promotion}` : "";
+
+  return from && to ? `${from}-${to}${promotion}` : "Move";
+}
+
+function getStringArray(value: unknown) {
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string")
+    : [];
+}
+
+function getMoveHistory(value: unknown) {
+  if (!Array.isArray(value)) return [];
+
+  return value.map((move) => ({
+    label: getMoveLabel(move),
+  }));
+}
+
 export default function GamePage() {
   const params = useParams();
   const router = useRouter();
@@ -61,7 +95,12 @@ export default function GamePage() {
       : Array.isArray(params.gameId)
         ? params.gameId[0]
         : undefined;
-  const [fen, setFen] = useState(new Chess().fen());
+  const [fen, setFen] = useState(STARTING_FEN);
+  const [positionHistory, setPositionHistory] = useState<string[]>([
+    STARTING_FEN,
+  ]);
+  const [positionIndex, setPositionIndex] = useState(0);
+  const [moveHistory, setMoveHistory] = useState<MoveRecord[]>([]);
   const [playerColor, setPlayerColor] = useState<PlayerColor | null>(null);
   const [connected, setConnected] = useState(false);
   const [gameEnd, setGameEnd] = useState(false);
@@ -115,6 +154,44 @@ export default function GamePage() {
     setNowMs(Date.now());
   }, []);
 
+  const resetPositionHistory = useCallback(
+    (nextFen: string, positions: string[] = [], moves: MoveRecord[] = []) => {
+      const nextPositions =
+        positions.length > 0 && positions.length === moves.length + 1
+          ? positions
+          : [nextFen];
+      const nextMoves =
+        nextPositions.length === moves.length + 1 ? moves : [];
+
+      setFen(nextFen);
+      setPositionHistory(nextPositions);
+      setPositionIndex(nextPositions.length - 1);
+      setMoveHistory(nextMoves);
+    },
+    [],
+  );
+
+  const addLivePosition = useCallback(
+    (nextFen: string, move: unknown) => {
+      setFen(nextFen);
+      setPositionHistory((history) => {
+        if (history[history.length - 1] === nextFen) {
+          setPositionIndex(history.length - 1);
+          return history;
+        }
+
+        const nextHistory = [...history, nextFen];
+        setMoveHistory((moves) => [
+          ...moves,
+          { label: getMoveLabel(move) },
+        ]);
+        setPositionIndex(nextHistory.length - 1);
+        return nextHistory;
+      });
+    },
+    [],
+  );
+
   useEffect(() => {
     const ws = createGameSocket();
     const sendResumeGame = () => {
@@ -139,8 +216,10 @@ export default function GamePage() {
         case "game_started":
         case "GAME_STARTED":
           setPlayerColor(normalizePlayerColor(payload.color));
-          setFen(
-            typeof payload.fen === "string" ? payload.fen : new Chess().fen(),
+          resetPositionHistory(
+            typeof payload.fen === "string" ? payload.fen : STARTING_FEN,
+            getStringArray(payload.positionHistory),
+            getMoveHistory(payload.moveHistory),
           );
           syncClock(payload);
           if (typeof payload.gameId === "string" && payload.gameId !== gameId) {
@@ -149,12 +228,13 @@ export default function GamePage() {
           break;
         case "move":
         case "MOVE":
-          setFen(
+          addLivePosition(
             typeof payload.fen === "string"
               ? payload.fen
               : typeof message.fen === "string"
                 ? message.fen
-                : new Chess().fen(),
+                : STARTING_FEN,
+            payload.move,
           );
           syncClock(payload);
           break;
@@ -211,7 +291,7 @@ export default function GamePage() {
       }
       setGameSocketListener(null);
     };
-  }, [gameId, router, syncClock]);
+  }, [addLivePosition, gameId, resetPositionHistory, router, syncClock]);
 
   useEffect(() => {
     if (!gameId) {
@@ -229,6 +309,10 @@ export default function GamePage() {
 
   const handleMove = (from: string, to: string, promotion?: string) => {
     if (gameEnd) return;
+    if (positionIndex !== positionHistory.length - 1) {
+      setPositionIndex(positionHistory.length - 1);
+      return;
+    }
 
     const move: { from: string; to: string; promotion?: string } = { from, to };
     if (promotion) move.promotion = promotion;
@@ -292,6 +376,28 @@ export default function GamePage() {
     bottomColor === "white" ? whiteDisplayMs : blackDisplayMs;
   const topLabel = topColor === "white" ? "White" : "Black";
   const bottomLabel = bottomColor === "white" ? "White" : "Black";
+  const displayedFen = positionHistory[positionIndex] ?? fen;
+  const canGoBack = positionIndex > 0;
+  const canGoForward = positionIndex < positionHistory.length - 1;
+  const isViewingLatest = !canGoForward;
+
+  const showPreviousPosition = () => {
+    setPositionIndex((index) => Math.max(0, index - 1));
+  };
+
+  const showNextPosition = () => {
+    setPositionIndex((index) => Math.min(positionHistory.length - 1, index + 1));
+  };
+  const movePairs = Array.from(
+    { length: Math.ceil(moveHistory.length / 2) },
+    (_, index) => ({
+      moveNumber: index + 1,
+      white: moveHistory[index * 2],
+      black: moveHistory[index * 2 + 1],
+      whiteIndex: index * 2 + 1,
+      blackIndex: index * 2 + 2,
+    }),
+  );
 
   return (
     <main className="min-h-screen bg-[#f7f5f0] text-neutral-950">
@@ -318,7 +424,7 @@ export default function GamePage() {
             <div className="relative aspect-square w-full max-w-[650px] overflow-hidden rounded-xl border border-neutral-200 bg-neutral-100 shadow-2xl shadow-neutral-300/60">
               <div className="flex h-full w-full items-center justify-center">
                 <ChessBoard
-                  position={fen}
+                  position={displayedFen}
                   playerColor={playerColor}
                   onMove={handleMove}
                 />
@@ -388,6 +494,26 @@ export default function GamePage() {
             </p>
 
             <div className="mt-6 grid gap-3">
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={showPreviousPosition}
+                  disabled={!canGoBack}
+                  aria-label="Show previous move"
+                  className="h-12 rounded-xl border border-neutral-200 bg-white px-5 text-xl font-extrabold text-neutral-700 transition hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  ←
+                </button>
+                <button
+                  type="button"
+                  onClick={showNextPosition}
+                  disabled={!canGoForward}
+                  aria-label="Show next move"
+                  className="h-12 rounded-xl border border-neutral-200 bg-white px-5 text-xl font-extrabold text-neutral-700 transition hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  →
+                </button>
+              </div>
               <button
                 type="button"
                 onClick={drawGame}
@@ -431,14 +557,65 @@ export default function GamePage() {
             )}
 
             <div className="mt-8 rounded-xl bg-[#f7f5f0] px-4 py-4 text-sm text-neutral-600">
-              <p className="font-semibold text-neutral-900">Game status</p>
-              <p className="mt-1">
-                {gameEnd
-                  ? gameResult
-                  : connected
-                    ? "Game is active."
+              <div className="flex items-center justify-between gap-3">
+                <p className="font-semibold text-neutral-900">Moves</p>
+                <p className="text-xs font-semibold text-neutral-500">
+                  {gameEnd
+                    ? gameResult
+                    : !isViewingLatest
+                      ? `${positionIndex}/${positionHistory.length - 1}`
+                      : connected
+                        ? "Live"
+                        : "Connecting"}
+                </p>
+              </div>
+
+              {movePairs.length > 0 ? (
+                <div className="mt-3 max-h-64 overflow-y-auto rounded-lg border border-neutral-200 bg-white">
+                  {movePairs.map((pair) => (
+                    <div
+                      key={pair.moveNumber}
+                      className="grid grid-cols-[3rem_1fr_1fr] border-b border-neutral-100 last:border-b-0"
+                    >
+                      <div className="bg-neutral-50 px-3 py-2 text-xs font-bold text-neutral-500">
+                        {pair.moveNumber}.
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setPositionIndex(pair.whiteIndex)}
+                        className={`px-3 py-2 text-left font-semibold transition hover:bg-emerald-50 hover:text-emerald-700 ${
+                          positionIndex === pair.whiteIndex
+                            ? "bg-emerald-50 text-emerald-700"
+                            : "text-neutral-700"
+                        }`}
+                      >
+                        {pair.white.label}
+                      </button>
+                      {pair.black ? (
+                        <button
+                          type="button"
+                          onClick={() => setPositionIndex(pair.blackIndex)}
+                          className={`px-3 py-2 text-left font-semibold transition hover:bg-emerald-50 hover:text-emerald-700 ${
+                            positionIndex === pair.blackIndex
+                              ? "bg-emerald-50 text-emerald-700"
+                              : "text-neutral-700"
+                          }`}
+                        >
+                          {pair.black.label}
+                        </button>
+                      ) : (
+                        <div className="px-3 py-2 text-neutral-400">...</div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-3 rounded-lg border border-neutral-200 bg-white px-3 py-3">
+                  {connected
+                    ? "No moves played yet."
                     : "Waiting for connection."}
-              </p>
+                </p>
+              )}
             </div>
           </div>
         </aside>

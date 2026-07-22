@@ -11,6 +11,12 @@ type GameOverPayload = {
   reason?: "checkmate" | "draw" | "timeout" | "resign"
 }
 
+type MoveHistoryEntry = {
+  san: string
+  from: string
+  to: string
+}
+
 export type TimeControl = {
   id: string
   label: string
@@ -32,6 +38,8 @@ export class Game{
   private timeoutTimer: NodeJS.Timeout | null = null
   private gameEnded = false
   private pendingDrawOfferBy: PlayerColor | null = null
+  private positionHistory: string[] = []
+  private moveHistory: MoveHistoryEntry[] = []
   private onGameOver: (gameId: string) => void
 
   constructor(
@@ -53,6 +61,7 @@ export class Game{
     this.blackTimeMs = timeControl.initialTimeMs
     this.board = new Chess()
     const initialFen = this.board.fen()
+    this.positionHistory = [initialFen]
     const route = `/game/${this.id}`
     const clock = this.getClockState()
 
@@ -63,6 +72,8 @@ export class Game{
         gameId: this.id,
         route,
         fen: initialFen,
+        positionHistory: this.positionHistory,
+        moveHistory: this.moveHistory,
         timeControl,
         ...clock,
       }
@@ -74,6 +85,8 @@ export class Game{
         gameId: this.id,
         route,
         fen: initialFen,
+        positionHistory: this.positionHistory,
+        moveHistory: this.moveHistory,
         timeControl,
         ...clock,
       }
@@ -129,6 +142,8 @@ export class Game{
         route: `/game/${this.id}`,
         fen: this.board.fen(),
         moveCount: this.moveCount,
+        positionHistory: this.positionHistory,
+        moveHistory: this.moveHistory,
         timeControl: this.timeControl,
         ...this.getClockState(),
       }
@@ -360,6 +375,12 @@ export class Game{
         this.blackTimeMs += this.timeControl.incrementMs
       }
       this.moveCount++;
+      this.positionHistory.push(this.board.fen())
+      this.moveHistory.push({
+        san: result.san,
+        from: result.from,
+        to: result.to,
+      })
       this.pendingDrawOfferBy = null
       this.lastTurnStartedAt = Date.now()
 

@@ -7,6 +7,7 @@ import {
   setGameSocketListener,
   setGameSocketStatusListener,
 } from "../lib/gameSocket";
+import { Navbar } from "../Navbar";
 import playImage from "../../img/Screenshot From 2026-06-02 16-06-45.png";
 
 type TimeControl = {
@@ -246,9 +247,11 @@ export default function Play() {
   }
 
   return (
-    <main className="min-h-screen bg-[#f7f5f0] text-neutral-950">
-      <div className="mx-auto flex min-h-screen w-full max-w-[1180px] flex-col gap-6 px-4 py-6 lg:flex-row lg:px-6">
-        <section className="flex min-h-[58vh] flex-1 flex-col overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-xl shadow-neutral-200/70 lg:min-h-[calc(100vh-3rem)]">
+    <>
+      <Navbar />
+      <main className="min-h-[calc(100vh-4rem)] bg-[#f7f5f0] text-neutral-950">
+        <div className="mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-[1180px] flex-col gap-6 px-4 py-6 lg:flex-row lg:px-6">
+          <section className="flex min-h-[58vh] flex-1 flex-col overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-xl shadow-neutral-200/70 lg:min-h-[calc(100vh-7rem)]">
           <div className="flex h-16 items-center justify-between border-b border-neutral-100 px-5">
             <div className="flex items-center gap-3">
               <div className="h-10 w-10 rounded-lg bg-neutral-100 text-center text-3xl leading-10 text-neutral-500">
@@ -304,9 +307,9 @@ export default function Play() {
               {formatTimeControl(selectedTimeControl)}
             </div>
           </div>
-        </section>
+          </section>
 
-        <aside className="w-full rounded-2xl border border-neutral-200 bg-white shadow-xl shadow-neutral-200/70 lg:min-h-[calc(100vh-3rem)] lg:w-[420px]">
+          <aside className="w-full rounded-2xl border border-neutral-200 bg-white shadow-xl shadow-neutral-200/70 lg:min-h-[calc(100vh-7rem)] lg:w-[420px]">
           <div className="px-6 py-8">
             <p className="text-sm font-bold uppercase tracking-[0.2em] text-emerald-700">
               New Game
@@ -398,8 +401,9 @@ export default function Play() {
               </p>
             </div>
           </div>
-        </aside>
-      </div>
-    </main>
+          </aside>
+        </div>
+      </main>
+    </>
   );
 }
