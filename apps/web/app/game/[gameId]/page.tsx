@@ -104,6 +104,7 @@ export default function GamePage() {
   const [playerColor, setPlayerColor] = useState<PlayerColor | null>(null);
   const positionHistoryRef = useRef<string[]>([STARTING_FEN]);
   const moveHistoryRef = useRef<MoveRecord[]>([]);
+  const previousHistoryLengthRef = useRef(1);
   const lastAppliedMoveRef = useRef<{
     fen: string;
     label: string | null;
@@ -234,6 +235,13 @@ export default function GamePage() {
     positionHistoryRef.current = positionHistory;
     moveHistoryRef.current = moveHistory;
   }, [moveHistory, positionHistory]);
+
+  useEffect(() => {
+    if (positionHistory.length > previousHistoryLengthRef.current) {
+      setPositionIndex(positionHistory.length - 1);
+    }
+    previousHistoryLengthRef.current = positionHistory.length;
+  }, [positionHistory.length]);
 
   useEffect(() => {
     const ws = createGameSocket();
@@ -454,12 +462,12 @@ export default function GamePage() {
   );
 
   return (
-    <main className="min-h-screen bg-[#f7f5f0] text-neutral-950">
-      <div className="mx-auto flex min-h-screen w-full max-w-[1180px] flex-col gap-6 px-4 py-6 lg:flex-row lg:px-6">
-        <section className="flex min-h-[58vh] flex-1 flex-col overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-xl shadow-neutral-200/70 lg:min-h-[calc(100vh-3rem)]">
-          <div className="flex h-16 items-center justify-between border-b border-neutral-100 px-5">
+    <main className="h-screen overflow-hidden bg-[#f7f5f0] text-neutral-950">
+      <div className="mx-auto flex h-full w-full max-w-[1180px] flex-col gap-3 overflow-hidden px-3 py-3 lg:flex-row lg:gap-4 lg:px-5">
+        <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-xl shadow-neutral-200/70">
+          <div className="flex h-14 shrink-0 items-center justify-between border-b border-neutral-100 px-4">
             <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-lg bg-neutral-100 text-center text-3xl leading-10 text-neutral-500">
+              <div className="h-9 w-9 rounded-lg bg-neutral-100 text-center text-2xl leading-9 text-neutral-500">
                 ♟
               </div>
               <div>
@@ -469,13 +477,13 @@ export default function GamePage() {
                 </p>
               </div>
             </div>
-            <div className="rounded-lg bg-neutral-100 px-6 py-2 font-mono text-2xl font-bold tabular-nums text-neutral-600">
+            <div className="rounded-lg bg-neutral-100 px-4 py-1.5 font-mono text-xl font-bold tabular-nums text-neutral-600">
               {formatClock(topDisplayMs)}
             </div>
           </div>
 
-          <div className="flex flex-1 items-center justify-center bg-[#fbfaf7] px-4 py-6">
-            <div className="relative aspect-square w-full max-w-[650px] overflow-hidden rounded-xl border border-neutral-200 bg-neutral-100 shadow-2xl shadow-neutral-300/60">
+          <div className="flex min-h-0 flex-1 items-center justify-center bg-[#fbfaf7] px-3 py-3">
+            <div className="relative aspect-square h-full max-h-full w-auto max-w-full overflow-hidden rounded-xl border border-neutral-200 bg-neutral-100 shadow-2xl shadow-neutral-300/60">
               <div className="flex h-full w-full items-center justify-center">
                 <ChessBoard
                   position={displayedFen}
@@ -504,9 +512,9 @@ export default function GamePage() {
             </div>
           </div>
 
-          <div className="flex h-16 items-center justify-between border-t border-neutral-100 px-5">
+          <div className="flex h-14 shrink-0 items-center justify-between border-t border-neutral-100 px-4">
             <div className="flex items-center gap-3">
-              <div className="h-10 w-10 overflow-hidden rounded-lg bg-neutral-100">
+              <div className="h-9 w-9 overflow-hidden rounded-lg bg-neutral-100">
                 <Image
                   src={playImage}
                   alt=""
@@ -525,21 +533,21 @@ export default function GamePage() {
                 </p>
               </div>
             </div>
-            <div className="rounded-lg bg-neutral-900 px-6 py-2 font-mono text-2xl font-bold tabular-nums text-white">
+            <div className="rounded-lg bg-neutral-900 px-4 py-1.5 font-mono text-xl font-bold tabular-nums text-white">
               {formatClock(bottomDisplayMs)}
             </div>
           </div>
         </section>
 
-        <aside className="w-full rounded-2xl border border-neutral-200 bg-white shadow-xl shadow-neutral-200/70 lg:min-h-[calc(100vh-3rem)] lg:w-[420px]">
-          <div className="px-6 py-8">
+        <aside className="min-h-0 w-full shrink-0 overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-xl shadow-neutral-200/70 lg:w-[390px]">
+          <div className="flex h-full min-h-0 flex-col overflow-hidden px-5 py-5">
             <p className="text-sm font-bold uppercase tracking-[0.2em] text-emerald-700">
               Live Game
             </p>
-            <h1 className="mt-2 text-3xl font-extrabold text-neutral-950">
+            <h1 className="mt-1 text-2xl font-extrabold text-neutral-950">
               Game actions
             </h1>
-            <p className="mt-2 text-sm leading-6 text-neutral-500">
+            <p className="mt-1 text-sm leading-5 text-neutral-500">
               {connected
                 ? playerColor
                   ? `Playing as ${playerColor === "white" ? "White" : "Black"}.`
@@ -547,12 +555,12 @@ export default function GamePage() {
                 : "Connecting to game..."}
             </p>
 
-            <div className="mt-6 grid gap-3">
+            <div className="mt-4 grid gap-2">
               <button
                 type="button"
                 onClick={drawGame}
                 disabled={gameEnd || !connected || hasOutgoingDrawOffer}
-                className="h-12 rounded-xl border border-neutral-200 bg-white px-5 text-sm font-bold text-neutral-700 transition hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                className="h-11 rounded-xl border border-neutral-200 bg-white px-5 text-sm font-bold text-neutral-700 transition hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {hasOutgoingDrawOffer ? "Draw Offered" : "Offer Draw"}
               </button>
@@ -560,14 +568,14 @@ export default function GamePage() {
                 type="button"
                 onClick={resignGame}
                 disabled={gameEnd || !connected}
-                className="h-12 rounded-xl border border-red-200 bg-white px-5 text-sm font-bold text-red-600 transition hover:border-red-300 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                className="h-11 rounded-xl border border-red-200 bg-white px-5 text-sm font-bold text-red-600 transition hover:border-red-300 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Resign
               </button>
             </div>
 
             {hasIncomingDrawOffer && (
-              <div className="mt-5 flex flex-col gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+              <div className="mt-4 flex flex-col gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
                 <p className="text-sm font-bold text-emerald-800">
                   Opponent offered a draw
                 </p>
@@ -590,8 +598,8 @@ export default function GamePage() {
               </div>
             )}
 
-            <div className="mt-8 overflow-hidden rounded-xl border border-neutral-200 bg-white text-sm text-neutral-700 shadow-lg shadow-neutral-200/70">
-              <div className="flex items-center justify-between border-b border-neutral-200 bg-[#faf8f3] px-4 py-3">
+            <div className="mt-4 flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-neutral-200 bg-white text-sm text-neutral-700 shadow-lg shadow-neutral-200/70">
+              <div className="flex shrink-0 items-center justify-between border-b border-neutral-200 bg-[#faf8f3] px-4 py-3">
                 <div>
                   <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-700">
                     Move History
@@ -602,15 +610,15 @@ export default function GamePage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-[3rem_1fr_1fr] border-b border-neutral-200 bg-neutral-50">
-                <p className="px-3 py-3 text-xs font-bold text-neutral-500">
+              <div className="grid shrink-0 grid-cols-[3rem_1fr_1fr] border-b border-neutral-200 bg-neutral-50">
+                <p className="px-3 py-2 text-xs font-bold text-neutral-500">
                   #
                 </p>
-                <p className="px-3 py-3 font-bold text-neutral-900">White</p>
-                <p className="px-3 py-3 font-bold text-neutral-900">Black</p>
+                <p className="px-3 py-2 font-bold text-neutral-900">White</p>
+                <p className="px-3 py-2 font-bold text-neutral-900">Black</p>
               </div>
 
-              <div className="min-h-64 max-h-80 overflow-y-auto bg-white">
+              <div className="min-h-0 flex-1 overflow-y-auto bg-white">
                 {movePairs.length > 0 ? (
                   movePairs.map((pair) => (
                     <div
@@ -628,8 +636,9 @@ export default function GamePage() {
                             ? "bg-emerald-50 text-emerald-700"
                             : "text-neutral-700"
                         }`}
+                        disabled={!pair.white}
                       >
-                        {pair.white.label}
+                        {pair.white?.label ?? "—"}
                       </button>
                       {pair.black ? (
                         <button
@@ -657,14 +666,14 @@ export default function GamePage() {
                 )}
               </div>
 
-              <div className="border-t border-neutral-200 bg-[#faf8f3] px-2 py-2">
+              <div className="shrink-0 border-t border-neutral-200 bg-[#faf8f3] px-2 py-2">
                 <div className="grid grid-cols-4 gap-2">
                   <button
                     type="button"
                     onClick={showStartingPosition}
                     disabled={!canGoBack}
                     aria-label="Show starting position"
-                    className="h-12 rounded-lg bg-white text-lg font-extrabold text-neutral-700 transition hover:bg-neutral-100 hover:text-neutral-900 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="h-10 rounded-lg bg-white text-lg font-extrabold text-neutral-700 transition hover:bg-neutral-100 hover:text-neutral-900 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     |&lt;
                   </button>
@@ -673,7 +682,7 @@ export default function GamePage() {
                     onClick={showPreviousPosition}
                     disabled={!canGoBack}
                     aria-label="Show previous move"
-                    className="h-12 rounded-lg bg-white text-lg font-extrabold text-neutral-700 transition hover:bg-neutral-100 hover:text-neutral-900 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="h-10 rounded-lg bg-white text-lg font-extrabold text-neutral-700 transition hover:bg-neutral-100 hover:text-neutral-900 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     &lt;
                   </button>
@@ -682,7 +691,7 @@ export default function GamePage() {
                     onClick={showNextPosition}
                     disabled={!canGoForward}
                     aria-label="Show next move"
-                    className="h-12 rounded-lg bg-white text-lg font-extrabold text-neutral-700 transition hover:bg-neutral-100 hover:text-neutral-900 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="h-10 rounded-lg bg-white text-lg font-extrabold text-neutral-700 transition hover:bg-neutral-100 hover:text-neutral-900 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     &gt;
                   </button>
@@ -691,7 +700,7 @@ export default function GamePage() {
                     onClick={showLatestPosition}
                     disabled={!canGoForward}
                     aria-label="Show latest position"
-                    className="h-12 rounded-lg bg-white text-lg font-extrabold text-neutral-700 transition hover:bg-neutral-100 hover:text-neutral-900 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="h-10 rounded-lg bg-white text-lg font-extrabold text-neutral-700 transition hover:bg-neutral-100 hover:text-neutral-900 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     &gt;|
                   </button>

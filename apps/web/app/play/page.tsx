@@ -249,158 +249,158 @@ export default function Play() {
   return (
     <>
       <Navbar />
-      <main className="min-h-[calc(100vh-4rem)] bg-[#f7f5f0] text-neutral-950">
-        <div className="mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-[1180px] flex-col gap-6 px-4 py-6 lg:flex-row lg:px-6">
-          <section className="flex min-h-[58vh] flex-1 flex-col overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-xl shadow-neutral-200/70 lg:min-h-[calc(100vh-7rem)]">
-          <div className="flex h-16 items-center justify-between border-b border-neutral-100 px-5">
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-lg bg-neutral-100 text-center text-3xl leading-10 text-neutral-500">
-                ♟
+      <main className="h-[calc(100vh-4rem)] overflow-hidden bg-[#f7f5f0] text-neutral-950">
+        <div className="mx-auto flex h-full w-full max-w-[1180px] flex-col gap-3 overflow-hidden px-3 py-3 lg:flex-row lg:gap-4 lg:px-5">
+          <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-xl shadow-neutral-200/70">
+            <div className="flex h-14 shrink-0 items-center justify-between border-b border-neutral-100 px-4">
+              <div className="flex items-center gap-3">
+                <div className="h-9 w-9 rounded-lg bg-neutral-100 text-center text-2xl leading-9 text-neutral-500">
+                  ♟
+                </div>
+                <div>
+                  <p className="text-sm font-bold">Opponent</p>
+                  <p className="text-xs text-neutral-500">
+                    {waiting ? "Searching..." : "Ready when you are"}
+                  </p>
+                </div>
               </div>
-              <div>
-                <p className="text-sm font-bold">Opponent</p>
-                <p className="text-xs text-neutral-500">
-                  {waiting ? "Searching..." : "Ready when you are"}
-                </p>
+              <div className="rounded-lg bg-neutral-100 px-4 py-1.5 font-mono text-xl font-bold tabular-nums text-neutral-600">
+                {formatTimeControl(selectedTimeControl)}
               </div>
             </div>
-            <div className="rounded-lg bg-neutral-100 px-6 py-2 font-mono text-2xl font-bold tabular-nums text-neutral-600">
-              {formatTimeControl(selectedTimeControl)}
-            </div>
-          </div>
 
-          <div className="flex flex-1 items-center justify-center bg-[#fbfaf7] px-4 py-6">
-            <div className="relative aspect-square w-full max-w-[650px] overflow-hidden rounded-xl border border-neutral-200 bg-neutral-100 shadow-2xl shadow-neutral-300/60">
-              <Image
-                src={playImage}
-                sizes="(max-width: 1024px) 92vw, 650px"
-                alt="Chess match preview"
-                fill
-                priority
-                className="object-cover"
-              />
-              <div className="absolute inset-x-0 top-0 h-10 bg-gradient-to-b from-black/35 to-transparent" />
-              <div className="absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-black/35 to-transparent" />
-            </div>
-          </div>
-
-          <div className="flex h-16 items-center justify-between border-t border-neutral-100 px-5">
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 overflow-hidden rounded-lg bg-neutral-100">
+            <div className="flex min-h-0 flex-1 items-center justify-center bg-[#fbfaf7] px-3 py-3">
+              <div className="relative aspect-square h-full max-h-full w-auto max-w-full overflow-hidden rounded-xl border border-neutral-200 bg-neutral-100 shadow-2xl shadow-neutral-300/60">
                 <Image
                   src={playImage}
-                  alt=""
-                  width={40}
-                  height={40}
-                  className="h-full w-full object-cover"
+                  sizes="(max-width: 1024px) 92vw, 60vw"
+                  alt="Chess match preview"
+                  fill
+                  priority
+                  className="object-cover"
                 />
-              </div>
-              <div>
-                <p className="text-sm font-bold">
-                  {username}{" "}
-                  <span className="font-normal text-neutral-500">(625)</span>
-                </p>
-                <p className="text-xs text-neutral-500">You</p>
+                <div className="absolute inset-x-0 top-0 h-10 bg-gradient-to-b from-black/35 to-transparent" />
+                <div className="absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-black/35 to-transparent" />
               </div>
             </div>
-            <div className="rounded-lg bg-neutral-900 px-6 py-2 font-mono text-2xl font-bold tabular-nums text-white">
-              {formatTimeControl(selectedTimeControl)}
+
+            <div className="flex h-14 shrink-0 items-center justify-between border-t border-neutral-100 px-4">
+              <div className="flex items-center gap-3">
+                <div className="h-9 w-9 overflow-hidden rounded-lg bg-neutral-100">
+                  <Image
+                    src={playImage}
+                    alt=""
+                    width={40}
+                    height={40}
+                    className="h-full w-full object-cover"
+                  />
+                </div>
+                <div>
+                  <p className="text-sm font-bold">
+                    {username}{" "}
+                    <span className="font-normal text-neutral-500">(625)</span>
+                  </p>
+                  <p className="text-xs text-neutral-500">You</p>
+                </div>
+              </div>
+              <div className="rounded-lg bg-neutral-900 px-4 py-1.5 font-mono text-xl font-bold tabular-nums text-white">
+                {formatTimeControl(selectedTimeControl)}
+              </div>
             </div>
-          </div>
           </section>
 
-          <aside className="w-full rounded-2xl border border-neutral-200 bg-white shadow-xl shadow-neutral-200/70 lg:min-h-[calc(100vh-7rem)] lg:w-[420px]">
-          <div className="px-6 py-8">
-            <p className="text-sm font-bold uppercase tracking-[0.2em] text-emerald-700">
-              New Game
-            </p>
-            <h1 className="mt-2 text-3xl font-extrabold text-neutral-950">
-              Choose a time
-            </h1>
-            <p className="mt-2 text-sm leading-6 text-neutral-500">
-              Quick matchmaking with the essentials only.
-            </p>
+          <aside className="min-h-0 w-full shrink-0 overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-xl shadow-neutral-200/70 lg:w-[390px]">
+            <div className="h-full overflow-hidden px-5 py-5">
+              <p className="text-sm font-bold uppercase tracking-[0.2em] text-emerald-700">
+                New Game
+              </p>
+              <h1 className="mt-1 text-2xl font-extrabold text-neutral-950">
+                Choose a time
+              </h1>
+              <p className="mt-1 text-sm leading-5 text-neutral-500">
+                Quick matchmaking with the essentials only.
+              </p>
 
-            <div className="mt-6 grid gap-3">
-              {timeControls.map((control) => (
-                <button
-                  key={control.id}
-                  type="button"
-                  disabled={waiting}
-                  onClick={() => setSelectedTimeControl(control.id)}
-                  className={`flex min-h-16 items-center justify-between rounded-xl border px-4 text-left transition disabled:cursor-not-allowed disabled:opacity-60 ${
-                    selectedTimeControl === control.id
-                      ? "border-emerald-500 bg-emerald-50 shadow-sm ring-2 ring-emerald-100"
-                      : "border-neutral-200 bg-white hover:border-emerald-300 hover:bg-emerald-50/50"
-                  }`}
-                >
-                  <span>
-                    <span className="block text-base font-extrabold text-neutral-950">
-                      {control.label}
-                    </span>
-                    <span className="mt-1 block text-xs font-medium text-neutral-500">
-                      {control.description}
-                    </span>
-                  </span>
-                  <span
-                    className={`h-4 w-4 rounded-full border ${
+              <div className="mt-4 grid gap-2">
+                {timeControls.map((control) => (
+                  <button
+                    key={control.id}
+                    type="button"
+                    disabled={waiting}
+                    onClick={() => setSelectedTimeControl(control.id)}
+                    className={`flex min-h-14 items-center justify-between rounded-xl border px-4 text-left transition disabled:cursor-not-allowed disabled:opacity-60 ${
                       selectedTimeControl === control.id
-                        ? "border-emerald-600 bg-emerald-500"
-                        : "border-neutral-300 bg-white"
+                        ? "border-emerald-500 bg-emerald-50 shadow-sm ring-2 ring-emerald-100"
+                        : "border-neutral-200 bg-white hover:border-emerald-300 hover:bg-emerald-50/50"
                     }`}
-                  />
-                </button>
-              ))}
-            </div>
+                  >
+                    <span>
+                      <span className="block text-base font-extrabold text-neutral-950">
+                        {control.label}
+                      </span>
+                      <span className="mt-1 block text-xs font-medium text-neutral-500">
+                        {control.description}
+                      </span>
+                    </span>
+                    <span
+                      className={`h-4 w-4 rounded-full border ${
+                        selectedTimeControl === control.id
+                          ? "border-emerald-600 bg-emerald-500"
+                          : "border-neutral-300 bg-white"
+                      }`}
+                    />
+                  </button>
+                ))}
+              </div>
 
-            <div className="mt-5 rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-3">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-neutral-500">
-                Selected
-              </p>
-              <p className="mt-1 text-lg font-extrabold text-neutral-950">
-                {getSelectedTimeLabel(selectedTimeControl)} rated game
-              </p>
-            </div>
+              <div className="mt-4 rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-3">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-neutral-500">
+                  Selected
+                </p>
+                <p className="mt-1 text-lg font-extrabold text-neutral-950">
+                  {getSelectedTimeLabel(selectedTimeControl)} rated game
+                </p>
+              </div>
 
-            <button
-              type="button"
-              onClick={connectWs}
-              disabled={waiting}
-              className="mt-5 h-14 w-full rounded-xl bg-emerald-600 text-xl font-extrabold text-white shadow-lg shadow-emerald-200 transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:bg-neutral-300 disabled:text-neutral-500 disabled:shadow-none"
-            >
-              {waiting ? "Waiting..." : "Start Game"}
-            </button>
-
-            {socketUnavailable && (
-              <p className="mt-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
-                Game server is offline. Start the websocket server and try
-                again.
-              </p>
-            )}
-
-            {waiting && (
               <button
                 type="button"
-                onClick={cancelMatchmaking}
-                className="mt-3 h-12 w-full rounded-xl border border-red-200 bg-white text-sm font-bold text-red-600 transition hover:border-red-300 hover:bg-red-50"
+                onClick={connectWs}
+                disabled={waiting}
+                className="mt-4 h-12 w-full rounded-xl bg-emerald-600 text-lg font-extrabold text-white shadow-lg shadow-emerald-200 transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:bg-neutral-300 disabled:text-neutral-500 disabled:shadow-none"
               >
-                Cancel
+                {waiting ? "Waiting..." : "Start Game"}
               </button>
-            )}
 
-            <div className="mt-8 rounded-xl bg-[#f7f5f0] px-4 py-4 text-sm text-neutral-600">
-              <p className="font-semibold text-neutral-900">
-                Matchmaking status
-              </p>
-              <p className="mt-1">
-                {socketUnavailable
-                  ? `Waiting for ${wsDisplayUrl}.`
-                  : waiting
-                    ? "Looking for an opponent..."
-                    : "Pick a time control and start when ready."}
-              </p>
+              {socketUnavailable && (
+                <p className="mt-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+                  Game server is offline. Start the websocket server and try
+                  again.
+                </p>
+              )}
+
+              {waiting && (
+                <button
+                  type="button"
+                  onClick={cancelMatchmaking}
+                  className="mt-3 h-11 w-full rounded-xl border border-red-200 bg-white text-sm font-bold text-red-600 transition hover:border-red-300 hover:bg-red-50"
+                >
+                  Cancel
+                </button>
+              )}
+
+              <div className="mt-5 rounded-xl bg-[#f7f5f0] px-4 py-3 text-sm text-neutral-600">
+                <p className="font-semibold text-neutral-900">
+                  Matchmaking status
+                </p>
+                <p className="mt-1">
+                  {socketUnavailable
+                    ? `Waiting for ${wsDisplayUrl}.`
+                    : waiting
+                      ? "Looking for an opponent..."
+                      : "Pick a time control and start when ready."}
+                </p>
+              </div>
             </div>
-          </div>
           </aside>
         </div>
       </main>
