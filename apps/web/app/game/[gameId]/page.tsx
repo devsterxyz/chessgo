@@ -38,6 +38,8 @@ type MoveRecord = {
   label: string;
 };
 
+type PendingConfirmation = "draw" | "resign" | null;
+
 const STARTING_FEN = new Chess().fen();
 
 function getPayload(message: GameSocketMessage): Record<string, unknown> {
@@ -113,6 +115,8 @@ export default function GamePage() {
   const [gameEnd, setGameEnd] = useState(false);
   const [gameResult, setGameResult] = useState("Game Over");
   const [username, setUsername] = useState("Player");
+  const [pendingConfirmation, setPendingConfirmation] =
+    useState<PendingConfirmation>(null);
   const [clock, setClock] = useState<ClockState>(() => ({
     whiteTimeMs: 2 * 60 * 1000,
     blackTimeMs: 2 * 60 * 1000,
@@ -375,7 +379,13 @@ export default function GamePage() {
 
   const resignGame = () => {
     if (gameEnd) return;
+    setPendingConfirmation("resign");
+  };
 
+  const confirmResignGame = () => {
+    if (gameEnd) return;
+
+    setPendingConfirmation(null);
     sendGameSocketMessage({
       type: "resign_game",
     });
@@ -383,7 +393,13 @@ export default function GamePage() {
 
   const drawGame = () => {
     if (gameEnd) return;
+    setPendingConfirmation("draw");
+  };
 
+  const confirmDrawGame = () => {
+    if (gameEnd) return;
+
+    setPendingConfirmation(null);
     sendGameSocketMessage({
       type: "draw_offer",
     });
@@ -392,6 +408,7 @@ export default function GamePage() {
   const acceptDraw = () => {
     if (gameEnd) return;
 
+    setPendingConfirmation(null);
     sendGameSocketMessage({
       type: "draw_accept",
     });
@@ -400,6 +417,7 @@ export default function GamePage() {
   const declineDraw = () => {
     if (gameEnd) return;
 
+    setPendingConfirmation(null);
     sendGameSocketMessage({
       type: "draw_decline",
     });
@@ -420,6 +438,12 @@ export default function GamePage() {
   const hasOutgoingDrawOffer = Boolean(
     playerColor && clock.drawOfferBy && clock.drawOfferBy === playerColor,
   );
+  const confirmationQuestion =
+    pendingConfirmation === "resign"
+      ? "Do you want to resign?"
+      : pendingConfirmation === "draw"
+        ? "Do you want to offer a draw?"
+        : "";
   const bottomColor = playerColor ?? "white";
   const topColor: PlayerColor = bottomColor === "white" ? "black" : "white";
   const topDisplayMs = topColor === "white" ? whiteDisplayMs : blackDisplayMs;
@@ -432,23 +456,66 @@ export default function GamePage() {
   const canGoForward = positionIndex < positionHistory.length - 1;
   const isViewingLatest = !canGoForward;
 
-  const showPreviousPosition = () => {
+  const showPreviousPosition = useCallback(() => {
     setPositionIndex((index) => Math.max(0, index - 1));
-  };
+  }, []);
 
-  const showNextPosition = () => {
+  const showNextPosition = useCallback(() => {
     setPositionIndex((index) =>
       Math.min(positionHistory.length - 1, index + 1),
     );
-  };
+  }, [positionHistory.length]);
 
-  const showStartingPosition = () => {
+  const showStartingPosition = useCallback(() => {
     setPositionIndex(0);
-  };
+  }, []);
 
-  const showLatestPosition = () => {
+  const showLatestPosition = useCallback(() => {
     setPositionIndex(positionHistory.length - 1);
-  };
+  }, [positionHistory.length]);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const target = event.target;
+      const isTyping =
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target instanceof HTMLSelectElement ||
+        (target instanceof HTMLElement && target.isContentEditable);
+
+      if (isTyping) return;
+
+      if (event.key === "ArrowLeft" && canGoBack) {
+        event.preventDefault();
+        showPreviousPosition();
+      }
+
+      if (event.key === "ArrowRight" && canGoForward) {
+        event.preventDefault();
+        showNextPosition();
+      }
+
+      if (event.key === "ArrowUp" && canGoForward) {
+        event.preventDefault();
+        showLatestPosition();
+      }
+
+      if (event.key === "ArrowDown" && canGoBack) {
+        event.preventDefault();
+        showStartingPosition();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [
+    canGoBack,
+    canGoForward,
+    showLatestPosition,
+    showNextPosition,
+    showPreviousPosition,
+    showStartingPosition,
+  ]);
 
   const movePairs = Array.from(
     { length: Math.ceil(moveHistory.length / 2) },
@@ -573,6 +640,34 @@ export default function GamePage() {
                 Resign
               </button>
             </div>
+
+            {pendingConfirmation && (
+              <div className="mt-4 rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-3">
+                <p className="text-sm font-bold text-neutral-900">
+                  {confirmationQuestion}
+                </p>
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={
+                      pendingConfirmation === "resign"
+                        ? confirmResignGame
+                        : confirmDrawGame
+                    }
+                    className="h-10 rounded-lg bg-emerald-600 text-sm font-extrabold text-white transition hover:bg-emerald-500"
+                  >
+                    Yes
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPendingConfirmation(null)}
+                    className="h-10 rounded-lg border border-neutral-200 bg-white text-sm font-bold text-neutral-700 transition hover:border-neutral-300 hover:bg-neutral-100"
+                  >
+                    No
+                  </button>
+                </div>
+              </div>
+            )}
 
             {hasIncomingDrawOffer && (
               <div className="mt-4 flex flex-col gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
