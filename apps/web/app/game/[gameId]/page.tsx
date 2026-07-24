@@ -113,6 +113,7 @@ export default function GamePage() {
   } | null>(null);
   const [connected, setConnected] = useState(false);
   const [gameEnd, setGameEnd] = useState(false);
+  const [resultDialogOpen, setResultDialogOpen] = useState(false);
   const [gameResult, setGameResult] = useState("Game Over");
   const [username, setUsername] = useState("Player");
   const [pendingConfirmation, setPendingConfirmation] =
@@ -309,6 +310,7 @@ export default function GamePage() {
           syncClock(payload);
           setGameResult(result);
           setGameEnd(true);
+          setResultDialogOpen(true);
           break;
       }
     };
@@ -558,21 +560,23 @@ export default function GamePage() {
                   onMove={handleMove}
                 />
               </div>
-              {gameEnd && (
+              {gameEnd && resultDialogOpen && (
                 <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/75 backdrop-blur-sm">
-                  <div className="rounded-xl border border-neutral-200 bg-white p-6 text-center shadow-2xl shadow-neutral-300/70">
+                  <div className="relative rounded-xl border border-neutral-200 bg-white p-6 text-center shadow-2xl shadow-neutral-300/70">
+                    <button
+                      type="button"
+                      onClick={() => setResultDialogOpen(false)}
+                      aria-label="Close game result"
+                      className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-lg text-xl font-bold leading-none text-neutral-500 transition hover:bg-neutral-100 hover:text-neutral-950"
+                    >
+                      ×
+                    </button>
                     <h2 className="mb-3 text-2xl font-extrabold text-neutral-950">
                       Game Over
                     </h2>
                     <p className="mb-6 text-lg text-neutral-600">
                       {gameResult}
                     </p>
-                    <button
-                      onClick={() => router.push("/play")}
-                      className="rounded-xl bg-emerald-600 px-6 py-3 font-extrabold text-white shadow-lg shadow-emerald-200 hover:bg-emerald-500"
-                    >
-                      Back to Play
-                    </button>
                   </div>
                 </div>
               )}
