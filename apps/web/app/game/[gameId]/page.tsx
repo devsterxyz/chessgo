@@ -529,6 +529,21 @@ export default function GamePage() {
       blackIndex: index * 2 + 2,
     }),
   );
+  const resultWinner = gameResult.match(/^(White|Black) wins/)?.[1];
+  const resultTitle =
+    gameResult === "Draw"
+      ? "Draw"
+      : resultWinner
+        ? `${resultWinner} Won`
+        : "Game Over";
+  const resultReason = gameResult.includes("resignation")
+    ? "By Resignation"
+    : gameResult.includes("time")
+      ? "On Time"
+      : gameResult === "Draw"
+        ? "Game Drawn"
+        : "Checkmate";
+  const reviewedMoveCount = moveHistory.length;
 
   return (
     <main className="h-screen overflow-hidden bg-[#f7f5f0] text-neutral-950">
@@ -562,21 +577,95 @@ export default function GamePage() {
               </div>
               {gameEnd && resultDialogOpen && (
                 <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/75 backdrop-blur-sm">
-                  <div className="relative rounded-xl border border-neutral-200 bg-white p-6 text-center shadow-2xl shadow-neutral-300/70">
+                  <div className="relative w-[min(88%,400px)] rounded-2xl border border-neutral-900 bg-[#272521] px-4 pb-4 pt-5 text-center text-white shadow-2xl shadow-neutral-950/40">
                     <button
                       type="button"
                       onClick={() => setResultDialogOpen(false)}
                       aria-label="Close game result"
-                      className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-lg text-xl font-bold leading-none text-neutral-500 transition hover:bg-neutral-100 hover:text-neutral-950"
+                      className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-lg text-2xl font-bold leading-none text-neutral-400 transition hover:bg-white/10 hover:text-white"
                     >
                       ×
                     </button>
-                    <h2 className="mb-3 text-2xl font-extrabold text-neutral-950">
-                      Game Over
+                    <h2 className="text-3xl font-extrabold">
+                      {resultTitle}
                     </h2>
-                    <p className="mb-6 text-lg text-neutral-600">
-                      {gameResult}
+                    <p className="mt-1 text-sm font-bold text-neutral-300">
+                      {resultReason}
                     </p>
+
+                    <div className="mt-5 grid grid-cols-3 gap-2">
+                      <div className="rounded-xl bg-[#34312c] px-3 py-3">
+                        <p className="text-2xl font-extrabold text-amber-300">
+                          {playerColor === "white" ? "625" : "605"}
+                        </p>
+                        <p className="text-xs font-bold text-neutral-300">
+                          Rating
+                        </p>
+                      </div>
+                      <div className="rounded-xl bg-[#34312c] px-3 py-3">
+                        <p className="text-2xl font-extrabold text-emerald-300">
+                          {reviewedMoveCount}
+                        </p>
+                        <p className="text-xs font-bold text-neutral-300">
+                          Moves
+                        </p>
+                      </div>
+                      <div className="rounded-xl bg-[#34312c] px-3 py-3">
+                        <p className="text-2xl font-extrabold text-sky-300">
+                          {bottomLabel}
+                        </p>
+                        <p className="text-xs font-bold text-neutral-300">
+                          You
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 flex items-center gap-3 rounded-xl bg-white px-4 py-3 text-left text-neutral-800">
+                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-2xl">
+                        ♟
+                      </div>
+                      <p className="text-sm font-semibold">
+                        Close this dialog to analyze the position and replay
+                        each move.
+                      </p>
+                    </div>
+
+                    <div className="mt-3 grid grid-cols-3 gap-2">
+                      <div className="flex h-14 items-center justify-center rounded-xl bg-[#34312c] text-xl text-sky-300">
+                        !
+                      </div>
+                      <div className="flex h-14 items-center justify-center rounded-xl bg-[#34312c] text-xl text-emerald-300">
+                        ★
+                      </div>
+                      <div className="flex h-14 items-center justify-center rounded-xl bg-[#34312c] text-xl text-lime-300">
+                        ✓
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setResultDialogOpen(false)}
+                      className="mt-4 h-14 w-full rounded-xl bg-emerald-600 text-lg font-extrabold text-white shadow-lg shadow-emerald-950/30 transition hover:bg-emerald-500"
+                    >
+                      ★ Game Review
+                    </button>
+
+                    <div className="mt-2 grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => router.push("/play")}
+                        className="h-12 rounded-xl bg-[#34312c] text-sm font-extrabold text-white transition hover:bg-[#403c36]"
+                      >
+                        New 5 min
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => router.push("/play")}
+                        className="h-12 rounded-xl bg-[#34312c] text-sm font-extrabold text-white transition hover:bg-[#403c36]"
+                      >
+                        Rematch
+                      </button>
+                    </div>
                   </div>
                 </div>
               )}
