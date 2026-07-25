@@ -13,7 +13,7 @@ let messageListener: ((message: GameSocketMessage) => void) | null = null;
 let statusListener: ((status: GameSocketStatus) => void) | null = null;
 let lastGameStartedMessage: GameSocketMessage | null = null;
 
-const GAME_SOCKET_URL = process.env.NEXT_PUBLIC_WS_URL ?? "ws://localhost:8081";
+const GAME_SOCKET_URL = process.env.NEXT_PUBLIC_WS_URL ?? "ws://localhost:8080";
 
 export function createGameSocket() {
   if (

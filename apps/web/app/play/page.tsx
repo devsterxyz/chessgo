@@ -38,7 +38,7 @@ export default function Play() {
   const [selectedTimeControl, setSelectedTimeControl] = useState("5+0");
   const [username, setUsername] = useState("Player");
   const [socketUnavailable, setSocketUnavailable] = useState(false);
-  const wsDisplayUrl = process.env.NEXT_PUBLIC_WS_URL ?? "ws://localhost:8081";
+  const wsDisplayUrl = process.env.NEXT_PUBLIC_WS_URL ?? "ws://localhost:8080";
   const matchmakingRequestSentRef = useRef(false);
   const queuedInitGameOnOpenRef = useRef<(() => void) | null>(null);
   const queuedInitGameSocketRef = useRef<WebSocket | null>(null);
