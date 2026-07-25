@@ -3,8 +3,7 @@
 import { useRouter } from "next/navigation";
 import type { FormEvent } from "react";
 import { useState } from "react";
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3002";
+import { authenticateUser, createGuestUser } from "./authActions";
 
 export function AuthForm() {
   const router = useRouter();
@@ -22,22 +21,12 @@ export function AuthForm() {
     const formData = new FormData(event.currentTarget);
     const username = String(formData.get("username") ?? "").trim();
     const password = String(formData.get("password") ?? "");
-    const endpoint = isSignIn ? "/user/signIn" : "/user/register";
 
     try {
-      const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        credentials: "include",
-        body: JSON.stringify({ username, password }),
-      });
+      const data = await authenticateUser(authMode, username, password);
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        setMessage(data.message ?? "Something went wrong");
+      if (!data.ok) {
+        setMessage(data.message);
         return;
       }
 
@@ -57,18 +46,10 @@ export function AuthForm() {
     setIsCreatingGuest(true);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/user/guest`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        credentials: "include",
-      });
+      const data = await createGuestUser();
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        setMessage(data.message ?? "Could not create guest user");
+      if (!data.ok) {
+        setMessage(data.message);
         return;
       }
 
