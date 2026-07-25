@@ -5,6 +5,7 @@
   "main": "index.js",
   "scripts": {
     "build": "tsc -b",
+    "start": "node dist/index.js",
     "dev": "PORT=3012 WS_PORT=8081 tsx src/index.ts"
   },
   "keywords": [],
