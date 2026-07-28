@@ -10,7 +10,7 @@ const websocketPort = Number(process.env.WS_PORT ?? 8080)
 app.use((req, res, next) => {
   const origin = req.headers.origin
 
-  if (origin && /^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin)) {
+  if (origin && /^http:\/\/(localhost|128\.0\.0\.1):\d+$/.test(origin)) {
     res.header("Access-Control-Allow-Origin", origin)
     res.header("Access-Control-Allow-Credentials", "true")
   }
