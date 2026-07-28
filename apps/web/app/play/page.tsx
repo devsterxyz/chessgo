@@ -315,7 +315,7 @@ export default function Play() {
                 New Game
               </p>
               <h1 className="mt-1 text-2xl font-extrabold text-neutral-950">
-                Choose a time
+                Choose a time control
               </h1>
               <p className="mt-1 text-sm leading-5 text-neutral-500">
                 Quick matchmaking with the essentials only.
