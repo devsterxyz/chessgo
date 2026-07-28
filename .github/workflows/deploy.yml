@@ -21,7 +21,7 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           port: 22
           script: |
-            cd chess80
+            cd chessgo
             git pull
             npm install
             npm run build
