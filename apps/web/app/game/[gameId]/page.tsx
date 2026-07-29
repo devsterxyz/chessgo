@@ -10,6 +10,7 @@ import {
   getLastGameStartedMessage,
   sendGameSocketMessage,
   setGameSocketListener,
+  setGameSocketStatusListener,
 } from "../../lib/gameSocket";
 import playImage from "../../../img/Screenshot From 2026-06-02 16-06-45.png";
 
@@ -28,6 +29,10 @@ type ClockPayload = {
   blackTimeMs?: unknown;
   activeColor?: unknown;
   drawOfferBy?: unknown;
+};
+
+type TimeControlPayload = {
+  id?: unknown;
 };
 
 type StoredUser = {
@@ -116,6 +121,10 @@ export default function GamePage() {
   const [resultDialogOpen, setResultDialogOpen] = useState(false);
   const [gameResult, setGameResult] = useState("Game Over");
   const [username, setUsername] = useState("Player");
+  const [timeControlId, setTimeControlId] = useState("5+0");
+  const [searchingNewGame, setSearchingNewGame] = useState(false);
+  const queuedInitGameOnOpenRef = useRef<(() => void) | null>(null);
+  const queuedInitGameSocketRef = useRef<WebSocket | null>(null);
   const [pendingConfirmation, setPendingConfirmation] =
     useState<PendingConfirmation>(null);
   const [clock, setClock] = useState<ClockState>(() => ({
@@ -272,12 +281,23 @@ export default function GamePage() {
         case "game_started":
         case "GAME_STARTED":
           setPlayerColor(normalizePlayerColor(payload.color));
+          if (
+            payload.timeControl &&
+            typeof payload.timeControl === "object" &&
+            typeof (payload.timeControl as TimeControlPayload).id === "string"
+          ) {
+            setTimeControlId((payload.timeControl as TimeControlPayload).id);
+          }
           resetPositionHistory(
             typeof payload.fen === "string" ? payload.fen : STARTING_FEN,
             getStringArray(payload.positionHistory),
             getMoveHistory(payload.moveHistory),
           );
           syncClock(payload);
+          setSearchingNewGame(false);
+          setGameEnd(false);
+          setResultDialogOpen(false);
+          setPendingConfirmation(null);
           if (typeof payload.gameId === "string" && payload.gameId !== gameId) {
             router.replace(`/game/${payload.gameId}`);
           }
@@ -312,6 +332,12 @@ export default function GamePage() {
           setGameEnd(true);
           setResultDialogOpen(true);
           break;
+        case "WAITING_FOR_OPPONENT":
+          setSearchingNewGame(true);
+          break;
+        case "MATCHMAKING_CANCELLED":
+          setSearchingNewGame(false);
+          break;
       }
     };
 
@@ -329,6 +355,11 @@ export default function GamePage() {
     }
 
     setGameSocketListener(handleMessage);
+    setGameSocketStatusListener((status) => {
+      if (status === "unavailable" || status === "closed") {
+        setSearchingNewGame(false);
+      }
+    });
 
     let onOpen: (() => void) | null = null;
     if (ws.readyState === WebSocket.OPEN) {
@@ -347,6 +378,15 @@ export default function GamePage() {
         ws.removeEventListener("open", onOpen);
       }
       setGameSocketListener(null);
+      setGameSocketStatusListener(null);
+      if (queuedInitGameOnOpenRef.current && queuedInitGameSocketRef.current) {
+        queuedInitGameSocketRef.current.removeEventListener(
+          "open",
+          queuedInitGameOnOpenRef.current,
+        );
+      }
+      queuedInitGameOnOpenRef.current = null;
+      queuedInitGameSocketRef.current = null;
     };
   }, [addLivePosition, gameId, resetPositionHistory, router, syncClock]);
 
@@ -423,6 +463,88 @@ export default function GamePage() {
     sendGameSocketMessage({
       type: "draw_decline",
     });
+  };
+
+  const startNewGameSearch = () => {
+    if (!gameEnd) return;
+
+    const ws = createGameSocket();
+    const accessToken = localStorage.getItem("chessgo_access_token");
+    const user = JSON.parse(localStorage.getItem("chessgo_user") ?? "{}");
+    const initGameMessage = JSON.stringify({
+      type: "init_game",
+      payload: {
+        accessToken,
+        userId: user.id,
+        timeControlId,
+        rated: true,
+      },
+    });
+
+    setSearchingNewGame(true);
+
+    if (ws.readyState === WebSocket.OPEN) {
+      ws.send(initGameMessage);
+      return;
+    }
+
+    const onOpen = () => {
+      ws.send(initGameMessage);
+      queuedInitGameOnOpenRef.current = null;
+      queuedInitGameSocketRef.current = null;
+      ws.removeEventListener("open", onOpen);
+    };
+
+    ws.addEventListener("open", onOpen);
+    queuedInitGameOnOpenRef.current = onOpen;
+    queuedInitGameSocketRef.current = ws;
+  };
+
+  const cancelNewGameSearch = () => {
+    if (queuedInitGameOnOpenRef.current && queuedInitGameSocketRef.current) {
+      queuedInitGameSocketRef.current.removeEventListener(
+        "open",
+        queuedInitGameOnOpenRef.current,
+      );
+      queuedInitGameOnOpenRef.current = null;
+      queuedInitGameSocketRef.current = null;
+      setSearchingNewGame(false);
+      return;
+    }
+
+    const ws = createGameSocket();
+    const accessToken = localStorage.getItem("chessgo_access_token");
+    const user = JSON.parse(localStorage.getItem("chessgo_user") ?? "{}");
+    const cancelMessage = JSON.stringify({
+      type: "cancel_matchmaking",
+      payload: {
+        accessToken,
+        userId: user.id,
+      },
+    });
+
+    setSearchingNewGame(false);
+
+    if (ws.readyState === WebSocket.OPEN) {
+      ws.send(cancelMessage);
+      return;
+    }
+
+    if (ws.readyState === WebSocket.CONNECTING) {
+      ws.addEventListener("open", function onOpen() {
+        ws.send(cancelMessage);
+        ws.removeEventListener("open", onOpen);
+      });
+    }
+  };
+
+  const toggleNewGameSearch = () => {
+    if (searchingNewGame) {
+      cancelNewGameSearch();
+      return;
+    }
+
+    startNewGameSearch();
   };
 
   const elapsedMs = gameEnd ? 0 : nowMs - clock.receivedAtMs;
@@ -721,21 +843,26 @@ export default function GamePage() {
                   <button
                     type="button"
                     onClick={() => router.push("/")}
-                    className="h-11 rounded-xl border border-neutral-200 bg-white px-5 text-sm font-bold text-neutral-700 transition hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700"
+                    disabled={searchingNewGame}
+                    className="h-11 rounded-xl border border-neutral-200 bg-white px-5 text-sm font-bold text-neutral-700 transition hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Return Home
                   </button>
                   <div className="grid grid-cols-2 gap-2">
                     <button
                       type="button"
-                      disabled
-                      className="h-11 rounded-xl border border-neutral-200 bg-white px-4 text-sm font-bold text-neutral-500 opacity-70 disabled:cursor-not-allowed"
+                      onClick={toggleNewGameSearch}
+                      className={`h-11 rounded-xl border px-4 text-sm font-bold transition ${
+                        searchingNewGame
+                          ? "border-red-200 bg-red-50 text-red-600 hover:border-red-300 hover:bg-red-100"
+                          : "border-neutral-200 bg-white text-neutral-700 hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700"
+                      }`}
                     >
-                      New Game
+                      {searchingNewGame ? "Cancel" : "New Game"}
                     </button>
                     <button
                       type="button"
-                      disabled
+                      disabled={searchingNewGame}
                       className="h-11 rounded-xl border border-neutral-200 bg-white px-4 text-sm font-bold text-neutral-500 opacity-70 disabled:cursor-not-allowed"
                     >
                       Rematch
