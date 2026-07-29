@@ -281,12 +281,12 @@ export default function GamePage() {
         case "game_started":
         case "GAME_STARTED":
           setPlayerColor(normalizePlayerColor(payload.color));
-          if (
-            payload.timeControl &&
-            typeof payload.timeControl === "object" &&
-            typeof (payload.timeControl as TimeControlPayload).id === "string"
-          ) {
-            setTimeControlId((payload.timeControl as TimeControlPayload).id);
+          if (payload.timeControl && typeof payload.timeControl === "object") {
+            const nextTimeControlId = (payload.timeControl as TimeControlPayload)
+              .id;
+            if (typeof nextTimeControlId === "string") {
+              setTimeControlId(nextTimeControlId);
+            }
           }
           resetPositionHistory(
             typeof payload.fen === "string" ? payload.fen : STARTING_FEN,
