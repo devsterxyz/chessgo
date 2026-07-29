@@ -716,25 +716,55 @@ export default function GamePage() {
             </p>
 
             <div className="mt-4 grid gap-2">
-              <button
-                type="button"
-                onClick={drawGame}
-                disabled={gameEnd || !connected || hasOutgoingDrawOffer}
-                className="h-11 rounded-xl border border-neutral-200 bg-white px-5 text-sm font-bold text-neutral-700 transition hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {hasOutgoingDrawOffer ? "Draw Offered" : "Offer Draw"}
-              </button>
-              <button
-                type="button"
-                onClick={resignGame}
-                disabled={gameEnd || !connected}
-                className="h-11 rounded-xl border border-red-200 bg-white px-5 text-sm font-bold text-red-600 transition hover:border-red-300 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                Resign
-              </button>
+              {gameEnd ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => router.push("/")}
+                    className="h-11 rounded-xl border border-neutral-200 bg-white px-5 text-sm font-bold text-neutral-700 transition hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700"
+                  >
+                    Return Home
+                  </button>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      disabled
+                      className="h-11 rounded-xl border border-neutral-200 bg-white px-4 text-sm font-bold text-neutral-500 opacity-70 disabled:cursor-not-allowed"
+                    >
+                      New Game
+                    </button>
+                    <button
+                      type="button"
+                      disabled
+                      className="h-11 rounded-xl border border-neutral-200 bg-white px-4 text-sm font-bold text-neutral-500 opacity-70 disabled:cursor-not-allowed"
+                    >
+                      Rematch
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={drawGame}
+                    disabled={!connected || hasOutgoingDrawOffer}
+                    className="h-11 rounded-xl border border-neutral-200 bg-white px-5 text-sm font-bold text-neutral-700 transition hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {hasOutgoingDrawOffer ? "Draw Offered" : "Offer Draw"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={resignGame}
+                    disabled={!connected}
+                    className="h-11 rounded-xl border border-red-200 bg-white px-5 text-sm font-bold text-red-600 transition hover:border-red-300 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Resign
+                  </button>
+                </>
+              )}
             </div>
 
-            {pendingConfirmation && (
+            {!gameEnd && pendingConfirmation && (
               <div className="mt-4 rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-3">
                 <p className="text-sm font-bold text-neutral-900">
                   {confirmationQuestion}
