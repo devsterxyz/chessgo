@@ -121,6 +121,10 @@ export class Game{
     return null
   }
 
+  getTimeControl(){
+    return this.timeControl
+  }
+
   getOpponentColor(userId: number){
     if (userId === this.player1Id) return "black"
     if (userId === this.player2Id) return "white"

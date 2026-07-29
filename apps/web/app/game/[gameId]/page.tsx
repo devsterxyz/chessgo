@@ -123,8 +123,14 @@ export default function GamePage() {
   const [username, setUsername] = useState("Player");
   const [timeControlId, setTimeControlId] = useState("5+0");
   const [searchingNewGame, setSearchingNewGame] = useState(false);
+  const [waitingForRematch, setWaitingForRematch] = useState(false);
+  const [incomingRematch, setIncomingRematch] = useState(false);
+  const [rematchAvailable, setRematchAvailable] = useState(false);
+  const [rematchNotice, setRematchNotice] = useState("");
   const queuedInitGameOnOpenRef = useRef<(() => void) | null>(null);
   const queuedInitGameSocketRef = useRef<WebSocket | null>(null);
+  const gameEndRef = useRef(false);
+  const gameIdRef = useRef(gameId);
   const [pendingConfirmation, setPendingConfirmation] =
     useState<PendingConfirmation>(null);
   const [clock, setClock] = useState<ClockState>(() => ({
@@ -251,6 +257,14 @@ export default function GamePage() {
   }, [moveHistory, positionHistory]);
 
   useEffect(() => {
+    gameEndRef.current = gameEnd;
+  }, [gameEnd]);
+
+  useEffect(() => {
+    gameIdRef.current = gameId;
+  }, [gameId]);
+
+  useEffect(() => {
     if (positionHistory.length > previousHistoryLengthRef.current) {
       setPositionIndex(positionHistory.length - 1);
     }
@@ -295,6 +309,10 @@ export default function GamePage() {
           );
           syncClock(payload);
           setSearchingNewGame(false);
+          setWaitingForRematch(false);
+          setIncomingRematch(false);
+          setRematchAvailable(false);
+          setRematchNotice("");
           setGameEnd(false);
           setResultDialogOpen(false);
           setPendingConfirmation(null);
@@ -330,6 +348,7 @@ export default function GamePage() {
           syncClock(payload);
           setGameResult(result);
           setGameEnd(true);
+          setRematchAvailable(true);
           setResultDialogOpen(true);
           break;
         case "WAITING_FOR_OPPONENT":
@@ -337,6 +356,34 @@ export default function GamePage() {
           break;
         case "MATCHMAKING_CANCELLED":
           setSearchingNewGame(false);
+          break;
+        case "REMATCH_WAITING":
+          setWaitingForRematch(true);
+          setIncomingRematch(false);
+          setRematchNotice("");
+          break;
+        case "REMATCH_CANCELLED":
+          setWaitingForRematch(false);
+          break;
+        case "REMATCH_REQUESTED":
+          setIncomingRematch(true);
+          setRematchNotice("");
+          break;
+        case "REMATCH_REQUEST_CANCELLED":
+          setIncomingRematch(false);
+          break;
+        case "REMATCH_DECLINED":
+          setWaitingForRematch(false);
+          setRematchNotice("Your opponent declined the rematch.");
+          break;
+        case "REMATCH_DECLINE_SENT":
+          setIncomingRematch(false);
+          break;
+        case "REMATCH_UNAVAILABLE":
+          setWaitingForRematch(false);
+          setIncomingRematch(false);
+          setRematchAvailable(false);
+          setRematchNotice("Your opponent left, so rematch is unavailable.");
           break;
       }
     };
@@ -379,6 +426,17 @@ export default function GamePage() {
       }
       setGameSocketListener(null);
       setGameSocketStatusListener(null);
+      if (gameEndRef.current && gameIdRef.current) {
+        const user = JSON.parse(localStorage.getItem("chessgo_user") ?? "{}");
+        sendGameSocketMessage({
+          type: "leave_finished_game",
+          payload: {
+            gameId: gameIdRef.current,
+            accessToken: localStorage.getItem("chessgo_access_token"),
+            userId: user.id,
+          },
+        });
+      }
       if (queuedInitGameOnOpenRef.current && queuedInitGameSocketRef.current) {
         queuedInitGameSocketRef.current.removeEventListener(
           "open",
@@ -545,6 +603,52 @@ export default function GamePage() {
     }
 
     startNewGameSearch();
+  };
+
+  const sendAuthedGameMessage = (type: string) => {
+    const user = JSON.parse(localStorage.getItem("chessgo_user") ?? "{}");
+    sendGameSocketMessage({
+      type,
+      payload: {
+        gameId,
+        accessToken: localStorage.getItem("chessgo_access_token"),
+        userId: user.id,
+      },
+    });
+  };
+
+  const leaveFinishedGame = () => {
+    if (!gameEnd) return;
+
+    sendAuthedGameMessage("leave_finished_game");
+  };
+
+  const requestRematch = () => {
+    if (!gameEnd || searchingNewGame || !rematchAvailable) return;
+
+    if (waitingForRematch) {
+      sendAuthedGameMessage("rematch_cancel");
+      setWaitingForRematch(false);
+      return;
+    }
+
+    setWaitingForRematch(true);
+    setRematchNotice("");
+    sendAuthedGameMessage("rematch_request");
+  };
+
+  const acceptRematch = () => {
+    if (!gameEnd) return;
+
+    setIncomingRematch(false);
+    sendAuthedGameMessage("rematch_accept");
+  };
+
+  const declineRematch = () => {
+    if (!gameEnd) return;
+
+    setIncomingRematch(false);
+    sendAuthedGameMessage("rematch_decline");
   };
 
   const elapsedMs = gameEnd ? 0 : nowMs - clock.receivedAtMs;
@@ -842,8 +946,11 @@ export default function GamePage() {
                 <>
                   <button
                     type="button"
-                    onClick={() => router.push("/")}
-                    disabled={searchingNewGame}
+                    onClick={() => {
+                      leaveFinishedGame();
+                      router.push("/");
+                    }}
+                    disabled={searchingNewGame || waitingForRematch}
                     className="h-11 rounded-xl border border-neutral-200 bg-white px-5 text-sm font-bold text-neutral-700 transition hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Return Home
@@ -852,20 +959,28 @@ export default function GamePage() {
                     <button
                       type="button"
                       onClick={toggleNewGameSearch}
+                      disabled={waitingForRematch}
                       className={`h-11 rounded-xl border px-4 text-sm font-bold transition ${
                         searchingNewGame
                           ? "border-red-200 bg-red-50 text-red-600 hover:border-red-300 hover:bg-red-100"
-                          : "border-neutral-200 bg-white text-neutral-700 hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700"
+                          : "border-neutral-200 bg-white text-neutral-700 hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
                       }`}
                     >
                       {searchingNewGame ? "Cancel" : "New Game"}
                     </button>
                     <button
                       type="button"
-                      disabled={searchingNewGame}
-                      className="h-11 rounded-xl border border-neutral-200 bg-white px-4 text-sm font-bold text-neutral-500 opacity-70 disabled:cursor-not-allowed"
+                      onClick={requestRematch}
+                      disabled={
+                        searchingNewGame || incomingRematch || !rematchAvailable
+                      }
+                      className={`h-11 rounded-xl border px-4 text-sm font-bold transition disabled:cursor-not-allowed disabled:opacity-50 ${
+                        waitingForRematch
+                          ? "border-red-200 bg-red-50 text-red-600 hover:border-red-300 hover:bg-red-100"
+                          : "border-neutral-200 bg-white text-neutral-700 hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700"
+                      }`}
                     >
-                      Rematch
+                      {waitingForRematch ? "Cancel" : "Rematch"}
                     </button>
                   </div>
                 </>
@@ -890,6 +1005,36 @@ export default function GamePage() {
                 </>
               )}
             </div>
+
+            {gameEnd && incomingRematch && (
+              <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+                <p className="text-sm font-bold text-emerald-800">
+                  Opponent wants a rematch with you
+                </p>
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={acceptRematch}
+                    className="h-10 rounded-lg bg-emerald-600 text-sm font-extrabold text-white transition hover:bg-emerald-500"
+                  >
+                    Yes
+                  </button>
+                  <button
+                    type="button"
+                    onClick={declineRematch}
+                    className="h-10 rounded-lg border border-neutral-200 bg-white text-sm font-bold text-neutral-700 transition hover:border-neutral-300 hover:bg-neutral-100"
+                  >
+                    No
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {gameEnd && rematchNotice && (
+              <p className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+                {rematchNotice}
+              </p>
+            )}
 
             {!gameEnd && pendingConfirmation && (
               <div className="mt-4 rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-3">

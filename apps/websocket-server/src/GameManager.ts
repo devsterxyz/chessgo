@@ -9,7 +9,12 @@ import {
   DRAW_OFFER,
   GET_ACTIVE_GAME,
   INIT_GAME,
+  LEAVE_FINISHED_GAME,
   MOVE,
+  REMATCH_ACCEPT,
+  REMATCH_CANCEL,
+  REMATCH_DECLINE,
+  REMATCH_REQUEST,
   RESIGN_GAME,
   RESUME_GAME,
 } from "./messages.js"
@@ -19,6 +24,15 @@ type PendingUser = {
   userId: number
   timeControl: TimeControl
   rated: boolean
+}
+
+type FinishedGame = {
+  id: string
+  whiteUserId: number
+  blackUserId: number
+  whiteSocket: WebSocket
+  blackSocket: WebSocket
+  timeControl: TimeControl
 }
 
 const timeControls: Record<string, TimeControl> = {
@@ -45,6 +59,8 @@ export class GameManager{
   private socketUserIds: Map<WebSocket, number>
   private disconnectedPlayers: Map<string, Set<number>>
   private disconnectTimers: Map<string, NodeJS.Timeout>
+  private finishedGames: Map<string, FinishedGame>
+  private pendingRematches: Map<string, number>
   private readonly disconnectGraceMs = 10_000
 
   constructor(){
@@ -54,6 +70,8 @@ export class GameManager{
     this.socketUserIds = new Map()
     this.disconnectedPlayers = new Map()
     this.disconnectTimers = new Map()
+    this.finishedGames = new Map()
+    this.pendingRematches = new Map()
   }
 
   addUser(socket: WebSocket){
@@ -73,6 +91,8 @@ export class GameManager{
     }
 
     if (!userId) return
+
+    this.removeFinishedGamePlayer(socket, userId)
 
     const entry = Array.from(this.games.entries()).find(([_id, game]) =>
       game.isPlayer(userId) && game.getPlayerSocket(userId) === socket
@@ -247,6 +267,47 @@ export class GameManager{
     this.games.delete(id)
   }
 
+  private archiveFinishedGame(id: string, game: Game){
+    this.finishedGames.set(id, {
+      id,
+      whiteUserId: game.player1Id,
+      blackUserId: game.player2Id,
+      whiteSocket: game.player1,
+      blackSocket: game.player2,
+      timeControl: game.getTimeControl(),
+    })
+    this.pendingRematches.delete(id)
+  }
+
+  private removeFinishedGamePlayer(socket: WebSocket, userId: number){
+    const finishedEntry = Array.from(this.finishedGames.entries()).find(
+      ([_id, finishedGame]) =>
+        (finishedGame.whiteUserId === userId &&
+          finishedGame.whiteSocket === socket) ||
+        (finishedGame.blackUserId === userId &&
+          finishedGame.blackSocket === socket),
+    )
+
+    if (!finishedEntry) return
+
+    const [gameId, finishedGame] = finishedEntry
+    const opponent = this.getFinishedGameOpponent(finishedGame, userId)
+
+    this.finishedGames.delete(gameId)
+    this.pendingRematches.delete(gameId)
+
+    try {
+      opponent.socket.send(JSON.stringify({
+        type: "REMATCH_UNAVAILABLE",
+        payload: {
+          gameId,
+        },
+      }))
+    } catch {
+      // The opponent may already be gone too.
+    }
+  }
+
   private endGame(id: string, payload: {
     draw: boolean
     winner: "white" | "black" | null
@@ -255,6 +316,7 @@ export class GameManager{
     const game = this.games.get(id)
     if (!game) return
 
+    this.archiveFinishedGame(id, game)
     this.deleteGame(id)
 
     const message = JSON.stringify({
@@ -278,6 +340,158 @@ export class GameManager{
     return Array.from(this.games.values()).find(game =>
       game.isPlayer(userId) && game.getPlayerSocket(userId) === socket
     ) ?? null
+  }
+
+  private getFinishedGameForUser(gameId: unknown, userId: number) {
+    if (typeof gameId !== "string") return null
+
+    const finishedGame = this.finishedGames.get(gameId)
+    if (!finishedGame) return null
+    if (
+      finishedGame.whiteUserId !== userId &&
+      finishedGame.blackUserId !== userId
+    ) {
+      return null
+    }
+
+    return finishedGame
+  }
+
+  private getFinishedGameOpponent(finishedGame: FinishedGame, userId: number) {
+    if (finishedGame.whiteUserId === userId) {
+      return {
+        userId: finishedGame.blackUserId,
+        socket: finishedGame.blackSocket,
+      }
+    }
+
+    return {
+      userId: finishedGame.whiteUserId,
+      socket: finishedGame.whiteSocket,
+    }
+  }
+
+  private requestRematch(socket: WebSocket, gameId: unknown, accessToken: unknown, fallbackUserId: unknown){
+    const userId = this.authenticateSocket(socket, accessToken, fallbackUserId)
+    if (!userId) return
+
+    const finishedGame = this.getFinishedGameForUser(gameId, userId)
+    if (!finishedGame) return
+
+    this.pendingRematches.set(finishedGame.id, userId)
+    const opponent = this.getFinishedGameOpponent(finishedGame, userId)
+
+    socket.send(JSON.stringify({
+      type: "REMATCH_WAITING",
+      payload: {
+        gameId: finishedGame.id,
+      },
+    }))
+
+    opponent.socket.send(JSON.stringify({
+      type: "REMATCH_REQUESTED",
+      payload: {
+        gameId: finishedGame.id,
+        requestedBy: userId,
+      },
+    }))
+  }
+
+  private cancelRematch(socket: WebSocket, gameId: unknown, accessToken: unknown, fallbackUserId: unknown){
+    const userId = this.authenticateSocket(socket, accessToken, fallbackUserId)
+    if (!userId) return
+
+    const finishedGame = this.getFinishedGameForUser(gameId, userId)
+    if (!finishedGame) return
+    if (this.pendingRematches.get(finishedGame.id) !== userId) return
+
+    this.pendingRematches.delete(finishedGame.id)
+    const opponent = this.getFinishedGameOpponent(finishedGame, userId)
+
+    socket.send(JSON.stringify({
+      type: "REMATCH_CANCELLED",
+      payload: {
+        gameId: finishedGame.id,
+      },
+    }))
+
+    opponent.socket.send(JSON.stringify({
+      type: "REMATCH_REQUEST_CANCELLED",
+      payload: {
+        gameId: finishedGame.id,
+      },
+    }))
+  }
+
+  private acceptRematch(socket: WebSocket, gameId: unknown, accessToken: unknown, fallbackUserId: unknown){
+    const userId = this.authenticateSocket(socket, accessToken, fallbackUserId)
+    if (!userId) return
+
+    const finishedGame = this.getFinishedGameForUser(gameId, userId)
+    if (!finishedGame) return
+
+    const requesterId = this.pendingRematches.get(finishedGame.id)
+    if (!requesterId || requesterId === userId) return
+
+    this.pendingRematches.delete(finishedGame.id)
+    this.finishedGames.delete(finishedGame.id)
+
+    const gameIdForRematch = randomUUID()
+    const game = new Game(
+      gameIdForRematch,
+      finishedGame.blackSocket,
+      finishedGame.whiteSocket,
+      finishedGame.blackUserId,
+      finishedGame.whiteUserId,
+      finishedGame.timeControl,
+      (finishedGameId) => {
+        const finished = this.games.get(finishedGameId)
+        if (finished) {
+          this.archiveFinishedGame(finishedGameId, finished)
+        }
+        this.deleteGame(finishedGameId)
+      },
+    )
+    this.games.set(gameIdForRematch, game)
+  }
+
+  private declineRematch(socket: WebSocket, gameId: unknown, accessToken: unknown, fallbackUserId: unknown){
+    const userId = this.authenticateSocket(socket, accessToken, fallbackUserId)
+    if (!userId) return
+
+    const finishedGame = this.getFinishedGameForUser(gameId, userId)
+    if (!finishedGame) return
+
+    const requesterId = this.pendingRematches.get(finishedGame.id)
+    if (!requesterId || requesterId === userId) return
+
+    this.pendingRematches.delete(finishedGame.id)
+    const requester = this.getFinishedGameOpponent(finishedGame, userId)
+
+    requester.socket.send(JSON.stringify({
+      type: "REMATCH_DECLINED",
+      payload: {
+        gameId: finishedGame.id,
+        declinedBy: userId,
+      },
+    }))
+
+    socket.send(JSON.stringify({
+      type: "REMATCH_DECLINE_SENT",
+      payload: {
+        gameId: finishedGame.id,
+      },
+    }))
+  }
+
+  private leaveFinishedGame(socket: WebSocket, gameId: unknown, accessToken: unknown, fallbackUserId: unknown){
+    const userId = this.authenticateSocket(socket, accessToken, fallbackUserId)
+    if (!userId) return
+
+    const finishedGame = this.getFinishedGameForUser(gameId, userId)
+    if (!finishedGame) return
+
+    this.removeFinishedGamePlayer(socket, userId)
   }
 
   private addHandler(socket: WebSocket){
@@ -304,6 +518,51 @@ export class GameManager{
       if(message.type == CANCEL_MATCHMAKING){
         this.cancelMatchmaking(
           socket,
+          message.accessToken ?? message.payload?.accessToken,
+          message.userId ?? message.payload?.userId,
+        )
+      }
+
+      if(message.type == REMATCH_REQUEST){
+        this.requestRematch(
+          socket,
+          message.gameId ?? message.payload?.gameId,
+          message.accessToken ?? message.payload?.accessToken,
+          message.userId ?? message.payload?.userId,
+        )
+      }
+
+      if(message.type == REMATCH_CANCEL){
+        this.cancelRematch(
+          socket,
+          message.gameId ?? message.payload?.gameId,
+          message.accessToken ?? message.payload?.accessToken,
+          message.userId ?? message.payload?.userId,
+        )
+      }
+
+      if(message.type == REMATCH_ACCEPT){
+        this.acceptRematch(
+          socket,
+          message.gameId ?? message.payload?.gameId,
+          message.accessToken ?? message.payload?.accessToken,
+          message.userId ?? message.payload?.userId,
+        )
+      }
+
+      if(message.type == REMATCH_DECLINE){
+        this.declineRematch(
+          socket,
+          message.gameId ?? message.payload?.gameId,
+          message.accessToken ?? message.payload?.accessToken,
+          message.userId ?? message.payload?.userId,
+        )
+      }
+
+      if(message.type == LEAVE_FINISHED_GAME){
+        this.leaveFinishedGame(
+          socket,
+          message.gameId ?? message.payload?.gameId,
           message.accessToken ?? message.payload?.accessToken,
           message.userId ?? message.payload?.userId,
         )
@@ -349,7 +608,13 @@ export class GameManager{
             pendingUser.userId,
             userId,
             timeControl,
-            (finishedGameId) => this.deleteGame(finishedGameId),
+            (finishedGameId) => {
+              const finished = this.games.get(finishedGameId)
+              if (finished) {
+                this.archiveFinishedGame(finishedGameId, finished)
+              }
+              this.deleteGame(finishedGameId)
+            },
           )
           this.games.set(gameId, game)
           this.pendingUsers.delete(matchmakingKey)
