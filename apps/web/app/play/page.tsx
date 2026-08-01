@@ -260,7 +260,7 @@ export default function Play() {
                 <div>
                   <p className="text-sm font-bold">Opponent</p>
                   <p className="text-xs text-neutral-500">
-                    {waiting ? "Searching..." : "Ready when you are"}
+                    {waiting ? "Searching..." : "waiting for opponent"}
                   </p>
                 </div>
               </div>
