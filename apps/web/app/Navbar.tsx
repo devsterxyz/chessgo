@@ -85,10 +85,18 @@ export function Navbar() {
               <p className="truncate text-sm font-bold text-neutral-950">
                 {username}
               </p>
+              <Link
+                href={`/${username}`}
+                onClick={() => setIsProfileOpen(false)}
+                className="mt-3 block w-full rounded-lg border border-neutral-200 bg-white px-3 py-2 text-center text-sm font-bold text-neutral-700 transition hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700"
+                role="menuitem"
+              >
+                View Profile
+              </Link>
               <button
                 type="button"
                 onClick={handleLogout}
-                className="mt-3 w-full rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-bold text-red-600 transition hover:border-red-300 hover:bg-red-100"
+                className="mt-2 w-full rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-bold text-red-600 transition hover:border-red-300 hover:bg-red-100"
                 role="menuitem"
               >
                 Logout
