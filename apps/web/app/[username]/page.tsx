@@ -4,8 +4,7 @@ import Image from "next/image";
 import { use, useState } from "react";
 import { Navbar } from "../Navbar";
 
-type RatingEntry = {
-  category: string;
+type Rating = {
   rating: number;
   delta: number;
   sparkline: number[];
@@ -16,14 +15,9 @@ type UserProfile = {
   name: string;
   bio: string;
   avatarUrl: string;
-  isOnline: boolean;
   joinedDate: string;
-  views: number;
-  ratings: RatingEntry[];
+  rating: Rating;
   gamesPlayed: number;
-  wins: number;
-  draws: number;
-  losses: number;
 };
 
 const dummyProfiles: Record<string, UserProfile> = {
@@ -32,33 +26,13 @@ const dummyProfiles: Record<string, UserProfile> = {
     name: "dev Sharma",
     bio: "I should've protected my queen",
     avatarUrl: "/default-avatar.png",
-    isOnline: true,
     joinedDate: "Jun 20, 2023",
-    views: 60,
-    ratings: [
-      {
-        category: "Blitz",
-        rating: 625,
-        delta: -77,
-        sparkline: [580, 610, 640, 620, 590, 630, 650, 625],
-      },
-      {
-        category: "Rapid",
-        rating: 1182,
-        delta: 50,
-        sparkline: [1100, 1120, 1090, 1140, 1150, 1170, 1160, 1182],
-      },
-      {
-        category: "Bullet",
-        rating: 621,
-        delta: 0,
-        sparkline: [600, 590, 610, 615, 605, 620, 618, 621],
-      },
-    ],
+    rating: {
+      rating: 625,
+      delta: -77,
+      sparkline: [580, 610, 640, 620, 590, 630, 650, 625],
+    },
     gamesPlayed: 2106,
-    wins: 1048,
-    draws: 189,
-    losses: 869,
   },
 };
 
@@ -73,77 +47,14 @@ function getProfile(paramUsername: string): UserProfile {
     name: paramUsername.charAt(0).toUpperCase() + paramUsername.slice(1),
     bio: "No bio yet.",
     avatarUrl: "/default-avatar.png",
-    isOnline: false,
     joinedDate: "Jan 1, 2024",
-    views: 12,
-    ratings: [
-      {
-        category: "Blitz",
-        rating: 800,
-        delta: 0,
-        sparkline: [800, 800, 800, 800, 800, 800, 800, 800],
-      },
-      {
-        category: "Rapid",
-        rating: 800,
-        delta: 0,
-        sparkline: [800, 800, 800, 800, 800, 800, 800, 800],
-      },
-      {
-        category: "Bullet",
-        rating: 800,
-        delta: 0,
-        sparkline: [800, 800, 800, 800, 800, 800, 800, 800],
-      },
-    ],
+    rating: {
+      rating: 800,
+      delta: 0,
+      sparkline: [800, 800, 800, 800, 800, 800, 800, 800],
+    },
     gamesPlayed: 0,
-    wins: 0,
-    draws: 0,
-    losses: 0,
   };
-}
-
-
-function CategoryIcon({ category }: { category: string }) {
-  if (category === "Blitz") {
-    return (
-      <svg
-        viewBox="0 0 24 24"
-        fill="currentColor"
-        className="h-4 w-4 text-emerald-600"
-      >
-        <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
-      </svg>
-    );
-  }
-
-  if (category === "Rapid") {
-    return (
-      <svg
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        className="h-4 w-4 text-emerald-600"
-      >
-        <circle cx="12" cy="12" r="9" />
-        <polyline points="12 6 12 12 16 14" />
-      </svg>
-    );
-  }
-
-
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="currentColor"
-      className="h-4 w-4 text-emerald-600"
-    >
-      <path d="M12 2a10 10 0 100 20 10 10 0 000-20zm1 14.5h-2v-5h2v5zm0-7h-2v-2h2v2z" />
-    </svg>
-  );
 }
 
 
@@ -188,9 +99,9 @@ function Sparkline({
 }
 
 
-function RatingCard({ entry }: { entry: RatingEntry }) {
-  const isPositive = entry.delta > 0;
-  const isNegative = entry.delta < 0;
+function RatingCard({ rating }: { rating: Rating }) {
+  const isPositive = rating.delta > 0;
+  const isNegative = rating.delta < 0;
   const sparkColor = isNegative
     ? "#ef4444"
     : isPositive
@@ -198,88 +109,32 @@ function RatingCard({ entry }: { entry: RatingEntry }) {
       : "#a3a3a3";
 
   return (
-    <div className="flex flex-col justify-between rounded-xl border border-neutral-200 bg-white p-4 shadow-sm transition hover:border-emerald-300">
+    <div className="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm transition hover:border-emerald-300">
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <CategoryIcon category={entry.category} />
-          <span className="text-xs font-bold uppercase tracking-wider text-neutral-500">
-            {entry.category}
-          </span>
-        </div>
-        {entry.delta !== 0 && (
+        <span className="text-xs font-bold uppercase tracking-wider text-neutral-500">
+          Rating
+        </span>
+        {rating.delta !== 0 && (
           <span
             className={`text-xs font-bold ${isPositive ? "text-emerald-600" : "text-red-500"}`}
           >
-            {isPositive ? "↑" : "↓"} {Math.abs(entry.delta)}
+            {isPositive ? "↑" : "↓"} {Math.abs(rating.delta)}
           </span>
         )}
       </div>
 
       <p className="mt-2 text-3xl font-extrabold tabular-nums text-neutral-950">
-        {entry.rating}
+        {rating.rating}
       </p>
 
       <div className="mt-3">
-        <Sparkline data={entry.sparkline} color={sparkColor} />
+        <Sparkline data={rating.sparkline} color={sparkColor} />
       </div>
     </div>
   );
 }
 
-
-
-function PerformanceBar({
-  wins,
-  draws,
-  losses,
-}: {
-  wins: number;
-  draws: number;
-  losses: number;
-}) {
-  const total = wins + draws + losses;
-  if (total === 0) {
-    return <p className="text-sm text-neutral-400">No games played yet.</p>;
-  }
-
-  const winPct = (wins / total) * 100;
-  const drawPct = (draws / total) * 100;
-  const lossPct = (losses / total) * 100;
-
-  return (
-    <div className="flex flex-col gap-2">
-      <div className="flex h-2.5 w-full overflow-hidden rounded-full bg-neutral-100">
-        <div
-          className="bg-emerald-500 transition-all"
-          style={{ width: `${winPct}%` }}
-        />
-        <div
-          className="bg-neutral-300 transition-all"
-          style={{ width: `${drawPct}%` }}
-        />
-        <div
-          className="bg-red-400 transition-all"
-          style={{ width: `${lossPct}%` }}
-        />
-      </div>
-      <div className="flex justify-between text-xs font-semibold">
-        <span className="text-emerald-600">
-          {wins} W ({winPct.toFixed(0)}%)
-        </span>
-        <span className="text-neutral-500">
-          {draws} D ({drawPct.toFixed(0)}%)
-        </span>
-        <span className="text-red-500">
-          {losses} L ({lossPct.toFixed(0)}%)
-        </span>
-      </div>
-    </div>
-  );
-}
-
-
-
-const TABS = ["Overview", "Games", "Stats"];
+const TABS = ["Overview", "Games"];
 
 export default function ProfilePage({
   params,
@@ -289,6 +144,10 @@ export default function ProfilePage({
   const { username } = use(params);
   const profile = getProfile(username);
   const [activeTab, setActiveTab] = useState("Overview");
+  const displayName =
+    profile.name.trim().toLowerCase() === profile.username.trim().toLowerCase()
+      ? profile.username
+      : `${profile.name} / ${profile.username}`;
 
   return (
     <>
@@ -314,18 +173,12 @@ export default function ProfilePage({
                   <div className="flex flex-col">
                     <div className="flex flex-wrap items-center gap-2.5">
                       <h1 className="text-2xl font-extrabold text-neutral-950 sm:text-3xl">
-                        {profile.username}
+                        {displayName}
                       </h1>
-                      <button
-                        type="button"
-                        className="rounded-md border border-neutral-200 bg-neutral-100 px-2.5 py-1 text-xs font-semibold text-neutral-600 transition hover:bg-neutral-200"
-                      >
-                        Add flair
-                      </button>
                     </div>
 
                     <p className="mt-1 text-sm font-medium text-neutral-500">
-                      {profile.name}
+                      @{profile.username}
                     </p>
 
                     <p className="mt-2 text-sm text-neutral-700">
@@ -338,16 +191,6 @@ export default function ProfilePage({
                           {profile.joinedDate}
                         </strong>{" "}
                         Joined
-                      </span>
-                      <span>
-                        <strong className="font-semibold text-neutral-700">
-                          {profile.views}
-                        </strong>{" "}
-                        Views
-                      </span>
-                      <span className="flex items-center gap-1.5 font-semibold text-emerald-600">
-                        <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                        Online now
                       </span>
                     </div>
                   </div>
@@ -388,12 +231,10 @@ export default function ProfilePage({
               <div className="flex flex-col gap-4">
                 <section className="rounded-2xl border border-neutral-200 bg-white p-5 shadow-xl shadow-neutral-200/70">
                   <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-700">
-                    Ratings
+                    Rating
                   </h2>
-                  <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                    {profile.ratings.map((entry) => (
-                      <RatingCard key={entry.category} entry={entry} />
-                    ))}
+                  <div className="mt-4">
+                    <RatingCard rating={profile.rating} />
                   </div>
                 </section>
 
@@ -420,42 +261,11 @@ export default function ProfilePage({
               <div className="flex flex-col gap-4">
                 <section className="rounded-2xl border border-neutral-200 bg-white p-5 shadow-xl shadow-neutral-200/70">
                   <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-700">
-                    Performance
+                    Current Rating
                   </h2>
-                  <div className="mt-4">
-                    <PerformanceBar
-                      wins={profile.wins}
-                      draws={profile.draws}
-                      losses={profile.losses}
-                    />
-                  </div>
-                </section>
-
-                <section className="rounded-2xl border border-neutral-200 bg-white p-5 shadow-xl shadow-neutral-200/70">
-                  <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-700">
-                    Best Rating
-                  </h2>
-                  {(() => {
-                    const best = [...profile.ratings].sort(
-                      (a, b) => b.rating - a.rating,
-                    )[0];
-                    if (!best) return null;
-                    return (
-                      <div className="mt-3 flex items-center gap-3">
-                        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-50 border border-emerald-200">
-                          <CategoryIcon category={best.category} />
-                        </div>
-                        <div>
-                          <p className="text-2xl font-extrabold tabular-nums text-neutral-950">
-                            {best.rating}
-                          </p>
-                          <p className="text-xs font-semibold uppercase tracking-wider text-neutral-500">
-                            {best.category}
-                          </p>
-                        </div>
-                      </div>
-                    );
-                  })()}
+                  <p className="mt-3 text-3xl font-extrabold tabular-nums text-neutral-950">
+                    {profile.rating.rating}
+                  </p>
                 </section>
 
                 <section className="rounded-2xl border border-neutral-200 bg-white p-5 shadow-xl shadow-neutral-200/70">
@@ -465,15 +275,8 @@ export default function ProfilePage({
                   <dl className="mt-3 flex flex-col gap-2.5 text-sm">
                     <div className="flex justify-between">
                       <dt className="text-neutral-500">Username</dt>
-                      <dd className="font-bold text-neutral-950">
-                        {profile.username}
-                      </dd>
-                    </div>
-                    <div className="h-px bg-neutral-100" />
-                    <div className="flex justify-between">
-                      <dt className="text-neutral-500">Name</dt>
-                      <dd className="font-bold text-neutral-950">
-                        {profile.name}
+                      <dd className="text-right font-bold text-neutral-950">
+                        {displayName}
                       </dd>
                     </div>
                     <div className="h-px bg-neutral-100" />
@@ -485,11 +288,9 @@ export default function ProfilePage({
                     </div>
                     <div className="h-px bg-neutral-100" />
                     <div className="flex justify-between">
-                      <dt className="text-neutral-500">Status</dt>
-                      <dd
-                        className={`font-bold ${profile.isOnline ? "text-emerald-600" : "text-neutral-400"}`}
-                      >
-                        {profile.isOnline ? "Online now" : "Offline"}
+                      <dt className="text-neutral-500">Rating</dt>
+                      <dd className="font-bold text-neutral-950">
+                        {profile.rating.rating}
                       </dd>
                     </div>
                   </dl>
@@ -502,14 +303,6 @@ export default function ProfilePage({
             <div className="mt-4 rounded-2xl border border-neutral-200 bg-white p-8 text-center shadow-xl shadow-neutral-200/70">
               <p className="text-sm font-medium text-neutral-500">
                 Games tab — No completed games to display yet.
-              </p>
-            </div>
-          )}
-
-          {activeTab === "Stats" && (
-            <div className="mt-4 rounded-2xl border border-neutral-200 bg-white p-8 text-center shadow-xl shadow-neutral-200/70">
-              <p className="text-sm font-medium text-neutral-500">
-                Detailed stats breakdown coming soon.
               </p>
             </div>
           )}

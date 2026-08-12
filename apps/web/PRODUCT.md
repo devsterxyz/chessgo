@@ -27,7 +27,7 @@ Desktop-first web application designed for focused chess sessions, quick real-ti
 - Real-time 1v1 chess matchmaking via WebSockets (`ws://localhost:8080`)
 - Time controls: 3+0, 5+0, 10+0
 - Token-based user sessions in local storage
-- Dynamic player profiles (`/[username]`) with ratings (Blitz, Rapid, Bullet), performance breakdown (Wins/Draws/Losses), and rating sparklines
+- Dynamic player profiles (`/[username]`) with avatar, username identity, bio, joined date, a single rating system, game history, and account information
 - Desktop-first responsive layout with structured two-column grids
 
 ## Brand Commitments
