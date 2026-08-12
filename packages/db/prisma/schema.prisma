@@ -14,4 +14,9 @@ model User{
   password  String?
   createdAt DateTime  @default(now())
   RefreshToken String?
+
+  bio          String?
+  avatarUrl    String?
+
+  rating       Int      @default(800)
 }
