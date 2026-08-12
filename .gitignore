@@ -40,5 +40,7 @@ yarn-error.log*
 #ai agents
 .agents
 .codex
-.github
+.github/agents
+.github/hooks
+.github/skills
 .impeccable

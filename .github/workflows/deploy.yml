@@ -1,0 +1,32 @@
+name: Deploy to server
+on:
+  push:
+    branches:
+      - "main"
+
+jobs:
+  deploy:
+    name: Deploy to EC2
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Execute remote SSH commands using ssh-action
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ubuntu
+          key: ${{ secrets.EC2_SSH_KEY }}
+          port: 22 
+          script: |
+            set -e
+            export PATH="/home/ubuntu/.nvm/versions/node/v24.18.0/bin:$PATH"
+            cd ~/chessgo
+            git fetch origin main
+            git reset --hard origin/main
+            npm install
+            npm run build
+            pm2 restart all
+            pm2 save

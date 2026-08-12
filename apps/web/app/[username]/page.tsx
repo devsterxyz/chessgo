@@ -103,7 +103,6 @@ function getProfile(paramUsername: string): UserProfile {
   };
 }
 
-// -- Category SVG Icons ----------------------------------------------------
 
 function CategoryIcon({ category }: { category: string }) {
   if (category === "Blitz") {
@@ -135,7 +134,7 @@ function CategoryIcon({ category }: { category: string }) {
     );
   }
 
-  // Bullet or default
+
   return (
     <svg
       viewBox="0 0 24 24"
@@ -147,7 +146,6 @@ function CategoryIcon({ category }: { category: string }) {
   );
 }
 
-// -- Sparkline SVG ---------------------------------------------------------
 
 function Sparkline({
   data,
@@ -189,7 +187,6 @@ function Sparkline({
   );
 }
 
-// -- Rating Card -----------------------------------------------------------
 
 function RatingCard({ entry }: { entry: RatingEntry }) {
   const isPositive = entry.delta > 0;
@@ -229,7 +226,7 @@ function RatingCard({ entry }: { entry: RatingEntry }) {
   );
 }
 
-// -- Stats Performance Bar -------------------------------------------------
+
 
 function PerformanceBar({
   wins,
@@ -280,7 +277,7 @@ function PerformanceBar({
   );
 }
 
-// -- Main Page Component ---------------------------------------------------
+
 
 const TABS = ["Overview", "Games", "Stats"];
 
@@ -299,13 +296,10 @@ export default function ProfilePage({
 
       <main className="min-h-[calc(100vh-4rem)] bg-[#f7f5f0] px-3 py-5 text-neutral-950 sm:px-5 sm:py-6">
         <div className="mx-auto max-w-[1180px]">
-          {/* Profile Header Card (Matching Inspo Image Layout) */}
           <section className="overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-xl shadow-neutral-200/70">
             <div className="p-5 sm:p-7">
               <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-start">
-                {/* Left: Avatar + Info */}
                 <div className="flex flex-col gap-5 sm:flex-row sm:items-start">
-                  {/* Avatar */}
                   <div className="h-24 w-24 shrink-0 overflow-hidden rounded-xl border border-neutral-200 bg-neutral-100 sm:h-28 sm:w-28">
                     <Image
                       src={profile.avatarUrl}
@@ -317,9 +311,7 @@ export default function ProfilePage({
                     />
                   </div>
 
-                  {/* Info */}
                   <div className="flex flex-col">
-                    {/* Row 1: Username & Add Flair */}
                     <div className="flex flex-wrap items-center gap-2.5">
                       <h1 className="text-2xl font-extrabold text-neutral-950 sm:text-3xl">
                         {profile.username}
@@ -332,17 +324,14 @@ export default function ProfilePage({
                       </button>
                     </div>
 
-                    {/* Row 2: Real Name */}
                     <p className="mt-1 text-sm font-medium text-neutral-500">
                       {profile.name}
                     </p>
 
-                    {/* Row 3: Bio */}
                     <p className="mt-2 text-sm text-neutral-700">
                       {profile.bio}
                     </p>
 
-                    {/* Row 4: Joined, Views, Online Status */}
                     <div className="mt-4 flex flex-wrap items-center gap-4 text-xs text-neutral-500">
                       <span>
                         <strong className="font-semibold text-neutral-700">
@@ -364,7 +353,6 @@ export default function ProfilePage({
                   </div>
                 </div>
 
-                {/* Right: Edit Profile Button */}
                 <button
                   type="button"
                   className="self-start rounded-lg border border-neutral-200 bg-neutral-100 px-4 py-2 text-sm font-semibold text-neutral-700 transition hover:border-neutral-300 hover:bg-neutral-200"
@@ -374,7 +362,6 @@ export default function ProfilePage({
               </div>
             </div>
 
-            {/* Navigation Tabs Bar */}
             <div className="flex border-t border-neutral-200 px-5 sm:px-7">
               {TABS.map((tab) => (
                 <button
@@ -396,12 +383,9 @@ export default function ProfilePage({
             </div>
           </section>
 
-          {/* Tab Content */}
           {activeTab === "Overview" && (
             <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_340px]">
-              {/* Main Column */}
               <div className="flex flex-col gap-4">
-                {/* Rating Cards */}
                 <section className="rounded-2xl border border-neutral-200 bg-white p-5 shadow-xl shadow-neutral-200/70">
                   <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-700">
                     Ratings
@@ -413,7 +397,6 @@ export default function ProfilePage({
                   </div>
                 </section>
 
-                {/* Game History Placeholder */}
                 <section className="rounded-2xl border border-neutral-200 bg-white p-5 shadow-xl shadow-neutral-200/70">
                   <div className="flex items-center justify-between">
                     <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-700">
@@ -434,9 +417,7 @@ export default function ProfilePage({
                 </section>
               </div>
 
-              {/* Sidebar Column */}
               <div className="flex flex-col gap-4">
-                {/* Performance Breakdown */}
                 <section className="rounded-2xl border border-neutral-200 bg-white p-5 shadow-xl shadow-neutral-200/70">
                   <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-700">
                     Performance
@@ -450,7 +431,6 @@ export default function ProfilePage({
                   </div>
                 </section>
 
-                {/* Best Rating */}
                 <section className="rounded-2xl border border-neutral-200 bg-white p-5 shadow-xl shadow-neutral-200/70">
                   <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-700">
                     Best Rating
@@ -478,7 +458,6 @@ export default function ProfilePage({
                   })()}
                 </section>
 
-                {/* Account Details */}
                 <section className="rounded-2xl border border-neutral-200 bg-white p-5 shadow-xl shadow-neutral-200/70">
                   <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-700">
                     Account Info
