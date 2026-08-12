@@ -36,3 +36,9 @@ yarn-error.log*
 # Misc
 .DS_Store
 *.pem
+
+#ai agents
+.agents
+.codex
+.github
+.impeccable
