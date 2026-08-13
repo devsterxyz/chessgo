@@ -19,4 +19,5 @@ model User{
   avatarUrl    String?
 
   rating       Int      @default(800)
+  gamesPlayed  Int      @default(0)
 }

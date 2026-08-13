@@ -1,13 +1,47 @@
 import type { Request, Response } from "express";
 import bcrypt from "bcrypt";
 import { countGuestUsers, createUser, findUserByUsername } from "@repo/db"
-import { generateAccessAndRefreshTokens, generateAccessToken } from "../utils/tokens.utils.js";
+import { generateAccessAndRefreshTokens } from "../utils/tokens.utils.js";
 
 type AuthTokens = ReturnType<typeof generateAccessAndRefreshTokens>;
+type UserResponseInput = {
+  id: number;
+  username: string;
+  bio?: string | null;
+  avatarUrl?: string | null;
+  rating?: number | null;
+  gamesPlayed?: number | null;
+  createdAt: Date;
+};
+
+const toSafeUser = (user: UserResponseInput) => {
+  const numericRating = user.rating ?? 800;
+
+  return {
+    id: user.id,
+    username: user.username,
+    bio: user.bio ?? "No bio yet.",
+    avatarUrl: user.avatarUrl ?? "/default-avatar.png",
+    rating: {
+      rating: numericRating,
+      delta: 0,
+      sparkline: Array(8).fill(numericRating),
+    },
+    gamesPlayed: user.gamesPlayed ?? 0,
+    joinedDate: user.createdAt
+      ? new Date(user.createdAt).toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+        })
+      : null,
+    createdAt: user.createdAt,
+  };
+};
 
 const issueTokensAndRespond = (
   res: Response,
-  safeUser: object,
+  user: UserResponseInput,
   statusCode: number,
   message: string,
   tokens: AuthTokens,
@@ -16,7 +50,7 @@ const issueTokensAndRespond = (
 
   return res
     .status(statusCode)
-    .json({ message, user: safeUser, accessToken, refreshToken });
+    .json({ message, user: toSafeUser(user), accessToken, refreshToken });
 }
 
 export const registerUser = async (req: Request, res: Response) => {
@@ -45,15 +79,10 @@ export const registerUser = async (req: Request, res: Response) => {
       username
     })
     const tokens = generateAccessAndRefreshTokens(user.id);
-    const safeUser = {
-      id: user.id,
-      username: user.username,
-      createdAt: user.createdAt
-    };
 
     return issueTokensAndRespond(
       res,
-      safeUser,
+      user,
       201,
       "User registered successfully",
       tokens
@@ -105,15 +134,10 @@ export const signInUser = async (req: Request, res: Response) => {
     }
 
     const tokens = generateAccessAndRefreshTokens(user.id);
-    const safeUser = {
-      id: user.id,
-      username: user.username,
-      createdAt: user.createdAt
-    };
 
     return issueTokensAndRespond(
       res,
-      safeUser,
+      user,
       200,
       "Signed in successfully",
       tokens
@@ -152,15 +176,10 @@ export const createGuestUser = async (req: Request, res: Response) => {
           username
         });
         const tokens = generateAccessAndRefreshTokens(user.id);
-        const safeUser = {
-          id: user.id,
-          username: user.username,
-          createdAt: user.createdAt
-        };
 
         return issueTokensAndRespond(
           res,
-          safeUser,
+          user,
           201,
           "Guest user created successfully",
           tokens
@@ -181,3 +200,25 @@ export const createGuestUser = async (req: Request, res: Response) => {
     });
   }
 }
+
+export const getUserProfile = async (req: Request, res: Response) => {
+  try {
+    const user = req.user;
+
+    if (!user) {
+      return res.status(401).json({
+        message: "Unauthorized"
+      });
+    }
+
+    return res.status(200).json({
+      message: "User profile fetched successfully",
+      user: toSafeUser(user)
+    });
+  } catch (e: any) {
+    console.log("Get user profile error: ", e);
+    return res.status(500).json({
+      message: "Unable to fetch user profile"
+    });
+  }
+};

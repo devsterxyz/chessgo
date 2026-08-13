@@ -3,6 +3,10 @@ declare global {
     interface AuthenticatedUser {
       id: number;
       username: string;
+      bio: string | null;
+      avatarUrl: string | null;
+      rating: number;
+      gamesPlayed: number;
       createdAt: Date;
     }
 

@@ -1,8 +1,10 @@
 "use client";
 
-import Image from "next/image";
-import { use, useState } from "react";
+import { use, useEffect, useMemo, useState } from "react";
 import { Navbar } from "../Navbar";
+
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3002";
 
 type Rating = {
   rating: number;
@@ -11,52 +13,89 @@ type Rating = {
 };
 
 type UserProfile = {
+  id: string;
   username: string;
-  name: string;
   bio: string;
-  avatarUrl: string;
   joinedDate: string;
   rating: Rating;
   gamesPlayed: number;
 };
 
-const dummyProfiles: Record<string, UserProfile> = {
-  dev: {
-    username: "devyougotit",
-    name: "dev Sharma",
-    bio: "I should've protected my queen",
-    avatarUrl: "/default-avatar.png",
-    joinedDate: "Jun 20, 2023",
-    rating: {
-      rating: 625,
-      delta: -77,
-      sparkline: [580, 610, 640, 620, 590, 630, 650, 625],
-    },
-    gamesPlayed: 2106,
-  },
+type ApiRating = {
+  rating: number;
+  delta: number;
+  sparkline: number[];
 };
 
-function getProfile(paramUsername: string): UserProfile {
-  const normalized = paramUsername.toLowerCase();
-  if (dummyProfiles[normalized]) {
-    return dummyProfiles[normalized];
+type ApiUserProfile = {
+  id: string | number;
+  username: string;
+  bio?: string | null;
+  rating?: number | ApiRating | null;
+  gamesPlayed?: number | null;
+  createAt?: string | Date | null;
+  createdAt?: string | Date | null;
+  joinedDate?: string | null;
+};
+
+type ProfileResponse = {
+  message?: string;
+  user?: ApiUserProfile;
+};
+
+function formatJoinedDate(createdAt?: string | Date | null) {
+  if (!createdAt) {
+    return "Unknown";
   }
 
+  const date = new Date(createdAt);
+
+  if (Number.isNaN(date.getTime())) {
+    return "Unknown";
+  }
+
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  }).format(date);
+}
+
+function extractRating(rating?: number | ApiRating | null): Rating {
+  if (rating == null) {
+    return { rating: 800, delta: 0, sparkline: Array.from({ length: 8 }, () => 800) };
+  }
+
+  if (typeof rating === "number") {
+    return { rating, delta: 0, sparkline: Array.from({ length: 8 }, () => rating) };
+  }
+
+  const value = rating.rating ?? 800;
   return {
-    username: paramUsername,
-    name: paramUsername.charAt(0).toUpperCase() + paramUsername.slice(1),
-    bio: "No bio yet.",
-    avatarUrl: "/default-avatar.png",
-    joinedDate: "Jan 1, 2024",
-    rating: {
-      rating: 800,
-      delta: 0,
-      sparkline: [800, 800, 800, 800, 800, 800, 800, 800],
-    },
-    gamesPlayed: 0,
+    rating: value,
+    delta: rating.delta ?? 0,
+    sparkline:
+      rating.sparkline?.length >= 2
+        ? rating.sparkline
+        : Array.from({ length: 8 }, () => value),
   };
 }
 
+function toProfile(user: ApiUserProfile): UserProfile {
+  return {
+    id: String(user.id),
+    username: user.username,
+    bio: user.bio?.trim() || "No bio yet.",
+    joinedDate:
+      user.joinedDate || formatJoinedDate(user.createdAt ?? user.createAt),
+    rating: extractRating(user.rating),
+    gamesPlayed: user.gamesPlayed ?? 0,
+  };
+}
+
+function getInitials(username: string) {
+  return username.trim().slice(0, 2).toUpperCase() || "CG";
+}
 
 function Sparkline({
   data,
@@ -65,6 +104,10 @@ function Sparkline({
   data: number[];
   color: string;
 }) {
+  if (data.length < 2) {
+    return <div className="h-9 rounded bg-neutral-100" />;
+  }
+
   const min = Math.min(...data);
   const max = Math.max(...data);
   const range = max - min || 1;
@@ -142,12 +185,61 @@ export default function ProfilePage({
   params: Promise<{ username: string }>;
 }) {
   const { username } = use(params);
-  const profile = getProfile(username);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("Overview");
-  const displayName =
-    profile.name.trim().toLowerCase() === profile.username.trim().toLowerCase()
-      ? profile.username
-      : `${profile.name} / ${profile.username}`;
+  const displayName = profile?.username ?? username;
+  const initials = useMemo(() => getInitials(displayName), [displayName]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    async function loadProfile() {
+      setIsLoading(true);
+      setErrorMessage("");
+
+      const token = localStorage.getItem("chessgo_access_token");
+
+      if (!token) {
+        setProfile(null);
+        setErrorMessage("Sign in to view your profile.");
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        const response = await fetch(`${API_BASE_URL}/user/getProfile`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          signal: controller.signal,
+        });
+        const data = (await response.json()) as ProfileResponse;
+
+        if (!response.ok || !data.user) {
+          setProfile(null);
+          setErrorMessage(data.message ?? "Unable to load your profile.");
+          return;
+        }
+
+        setProfile(toProfile(data.user));
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") {
+          return;
+        }
+
+        setProfile(null);
+        setErrorMessage("Could not connect to the backend server.");
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    loadProfile();
+
+    return () => controller.abort();
+  }, []);
 
   return (
     <>
@@ -159,15 +251,8 @@ export default function ProfilePage({
             <div className="p-5 sm:p-7">
               <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-start">
                 <div className="flex flex-col gap-5 sm:flex-row sm:items-start">
-                  <div className="h-24 w-24 shrink-0 overflow-hidden rounded-xl border border-neutral-200 bg-neutral-100 sm:h-28 sm:w-28">
-                    <Image
-                      src={profile.avatarUrl}
-                      alt={profile.username}
-                      width={112}
-                      height={112}
-                      className="h-full w-full object-cover"
-                      priority
-                    />
+                  <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-xl bg-neutral-950 text-3xl font-extrabold text-white sm:h-28 sm:w-28">
+                    {initials}
                   </div>
 
                   <div className="flex flex-col">
@@ -178,21 +263,29 @@ export default function ProfilePage({
                     </div>
 
                     <p className="mt-1 text-sm font-medium text-neutral-500">
-                      @{profile.username}
+                      @{displayName}
                     </p>
 
                     <p className="mt-2 text-sm text-neutral-700">
-                      {profile.bio}
+                      {isLoading ? "Loading profile..." : profile?.bio}
                     </p>
 
-                    <div className="mt-4 flex flex-wrap items-center gap-4 text-xs text-neutral-500">
-                      <span>
-                        <strong className="font-semibold text-neutral-700">
-                          {profile.joinedDate}
-                        </strong>{" "}
-                        Joined
-                      </span>
-                    </div>
+                    {profile ? (
+                      <div className="mt-4 flex flex-wrap items-center gap-4 text-xs text-neutral-500">
+                        <span>
+                          <strong className="font-semibold text-neutral-700">
+                            {profile.joinedDate}
+                          </strong>{" "}
+                          Joined
+                        </span>
+                        <span>
+                          <strong className="font-semibold text-neutral-700">
+                            {profile.rating.rating}
+                          </strong>{" "}
+                          Rating
+                        </span>
+                      </div>
+                    ) : null}
                   </div>
                 </div>
 
@@ -211,11 +304,10 @@ export default function ProfilePage({
                   key={tab}
                   type="button"
                   onClick={() => setActiveTab(tab)}
-                  className={`relative px-4 py-3.5 text-sm font-bold transition ${
-                    activeTab === tab
+                  className={`relative px-4 py-3.5 text-sm font-bold transition ${activeTab === tab
                       ? "text-neutral-950"
                       : "text-neutral-500 hover:text-neutral-800"
-                  }`}
+                    }`}
                 >
                   {tab}
                   {activeTab === tab && (
@@ -226,7 +318,21 @@ export default function ProfilePage({
             </div>
           </section>
 
-          {activeTab === "Overview" && (
+          {errorMessage ? (
+            <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 p-5 text-sm font-semibold text-red-700 shadow-xl shadow-neutral-200/70">
+              {errorMessage}
+            </div>
+          ) : null}
+
+          {isLoading ? (
+            <div className="mt-4 rounded-2xl border border-neutral-200 bg-white p-8 text-center shadow-xl shadow-neutral-200/70">
+              <p className="text-sm font-medium text-neutral-500">
+                Loading profile...
+              </p>
+            </div>
+          ) : null}
+
+          {profile && activeTab === "Overview" && (
             <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_340px]">
               <div className="flex flex-col gap-4">
                 <section className="rounded-2xl border border-neutral-200 bg-white p-5 shadow-xl shadow-neutral-200/70">
@@ -299,10 +405,10 @@ export default function ProfilePage({
             </div>
           )}
 
-          {activeTab === "Games" && (
+          {profile && activeTab === "Games" && (
             <div className="mt-4 rounded-2xl border border-neutral-200 bg-white p-8 text-center shadow-xl shadow-neutral-200/70">
               <p className="text-sm font-medium text-neutral-500">
-                Games tab — No completed games to display yet.
+                Games tab - No completed games to display yet.
               </p>
             </div>
           )}

@@ -33,11 +33,15 @@ export const createUser = (data: CreateUserInput) => {
   return client.user.create({
     data: {
       username: data.username,
-      password: data.password ?? ""
+      password: data.password ?? null
     },
     select: {
       id: true,
       username: true,
+      bio: true,
+      avatarUrl: true,
+      rating: true,
+      gamesPlayed: true,
       createdAt: true
     }
   })
@@ -62,6 +66,10 @@ export const updateUser = (id: number, refreshToken: string) => {
     select: {
       id: true,
       username: true,
+      bio: true,
+      avatarUrl: true,
+      rating: true,
+      gamesPlayed: true,
       createdAt: true
     }
   })
@@ -73,6 +81,10 @@ export const findUserByUserId = (id: number) => {
     select: {
       id: true,
       username: true,
+      bio: true,
+      avatarUrl: true,
+      rating: true,
+      gamesPlayed: true,
       createdAt: true
     }
   })
