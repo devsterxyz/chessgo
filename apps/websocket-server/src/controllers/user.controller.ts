@@ -1,6 +1,12 @@
 import type { Request, Response } from "express";
 import bcrypt from "bcrypt";
-import { countGuestUsers, createUser, findUserByUsername } from "@repo/db"
+import {
+  countGuestUsers,
+  createUser,
+  findUserByUsername,
+  updateRefreshToken,
+  updateUserProfile
+} from "@repo/db";
 import { generateAccessAndRefreshTokens } from "../utils/tokens.utils.js";
 
 type AuthTokens = ReturnType<typeof generateAccessAndRefreshTokens>;
@@ -222,3 +228,35 @@ export const getUserProfile = async (req: Request, res: Response) => {
     });
   }
 };
+
+export const updateUser = async (req: Request, res: Response) => {
+  try {
+    const user = req.user;
+    if (!user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    const userId: number = user.id;
+    const updates = req.body as {
+      username?: string;
+      bio?: string;
+      avatarUrl?: string;
+    };
+
+    if (updates.bio && updates.bio.length > 200) {
+      return res
+        .status(400)
+        .json({ message: "Bio must be 200 characters or less." });
+    }
+
+    const updatedUser = await updateUserProfile(userId, updates);
+
+    return res.status(200).json({
+      message: "User profile updated successfully",
+      user: toSafeUser(updatedUser),
+    });
+  } catch (e: any) {
+    console.log("User update profile error: ", e);
+    return res.status(500).json({ message: "Unable to update user profile" });
+  }
+}

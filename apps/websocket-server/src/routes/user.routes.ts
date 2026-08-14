@@ -4,7 +4,8 @@ import {
   getUserProfile,
   logoutUser,
   registerUser,
-  signInUser
+  signInUser,
+  updateUser
 } from "../controllers/user.controller.js";
 import { verifyJWT } from "../middleware/user.middleware.js";
 
@@ -18,6 +19,7 @@ router.route("/signIn").post(signInUser)
 router.route("/logout").post(logoutUser)
 router.route("/guest").post(createGuestUser)
 router.route("/getProfile").get(verifyJWT, getUserProfile)
+router.route("/updateProfile").put(verifyJWT, updateUser)
 
 
 export default router

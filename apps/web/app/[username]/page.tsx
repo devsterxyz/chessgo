@@ -43,6 +43,8 @@ type ProfileResponse = {
   user?: ApiUserProfile;
 };
 
+const MAX_BIO_LENGTH = 200;
+
 function formatJoinedDate(createdAt?: string | Date | null) {
   if (!createdAt) {
     return "Unknown";
@@ -189,8 +191,79 @@ export default function ProfilePage({
   const [errorMessage, setErrorMessage] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("Overview");
+  const [isEditingBio, setIsEditingBio] = useState(false);
+  const [bioDraft, setBioDraft] = useState("");
+  const [bioError, setBioError] = useState("");
+  const [isSavingBio, setIsSavingBio] = useState(false);
   const displayName = profile?.username ?? username;
   const initials = useMemo(() => getInitials(displayName), [displayName]);
+
+  function startEditingBio() {
+    if (!profile) return;
+
+    setBioDraft(profile.bio === "No bio yet." ? "" : profile.bio);
+    setBioError("");
+    setIsEditingBio(true);
+  }
+
+  function cancelEditingBio() {
+    setIsEditingBio(false);
+    setBioDraft("");
+    setBioError("");
+  }
+
+  async function saveBio() {
+    const token = localStorage.getItem("chessgo_access_token");
+    const nextBio = bioDraft.trim();
+
+    if (!token) {
+      setBioError("Sign in again to update your profile.");
+      return;
+    }
+
+    if (nextBio.length > MAX_BIO_LENGTH) {
+      setBioError(`Bio must be ${MAX_BIO_LENGTH} characters or less.`);
+      return;
+    }
+
+    setIsSavingBio(true);
+    setBioError("");
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/user/updateProfile`, {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ bio: nextBio }),
+      });
+      const data = (await response.json()) as ProfileResponse;
+
+      if (!response.ok || !data.user) {
+        setBioError(data.message ?? "Unable to update your bio.");
+        return;
+      }
+
+      const updatedProfile = toProfile(data.user);
+      setProfile(updatedProfile);
+      setIsEditingBio(false);
+      setBioDraft("");
+
+      const storedUser = localStorage.getItem("chessgo_user");
+      if (storedUser) {
+        const user = JSON.parse(storedUser) as Record<string, unknown>;
+        localStorage.setItem(
+          "chessgo_user",
+          JSON.stringify({ ...user, ...data.user })
+        );
+      }
+    } catch {
+      setBioError("Could not connect to the backend server.");
+    } finally {
+      setIsSavingBio(false);
+    }
+  }
 
   useEffect(() => {
     const controller = new AbortController();
@@ -266,9 +339,53 @@ export default function ProfilePage({
                       @{displayName}
                     </p>
 
-                    <p className="mt-2 text-sm text-neutral-700">
-                      {isLoading ? "Loading profile..." : profile?.bio}
-                    </p>
+                    {isEditingBio ? (
+                      <div className="mt-3 flex max-w-xl flex-col gap-2">
+                        <textarea
+                          value={bioDraft}
+                          onChange={(event) => {
+                            setBioDraft(event.target.value);
+                            if (bioError) setBioError("");
+                          }}
+                          maxLength={MAX_BIO_LENGTH}
+                          rows={3}
+                          className="min-h-24 resize-none rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-800 outline-none transition placeholder:text-neutral-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                          placeholder="Tell players a little about your chess style."
+                        />
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                          <p className="text-xs font-medium text-neutral-500">
+                            {bioDraft.trim().length}/{MAX_BIO_LENGTH}
+                          </p>
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={cancelEditingBio}
+                              disabled={isSavingBio}
+                              className="rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm font-semibold text-neutral-700 transition hover:border-neutral-300 hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              type="button"
+                              onClick={saveBio}
+                              disabled={isSavingBio}
+                              className="rounded-lg bg-emerald-500 px-3 py-2 text-sm font-bold text-white transition hover:bg-emerald-600 disabled:cursor-not-allowed disabled:bg-emerald-300"
+                            >
+                              {isSavingBio ? "Saving..." : "Save Bio"}
+                            </button>
+                          </div>
+                        </div>
+                        {bioError ? (
+                          <p className="text-sm font-semibold text-red-600">
+                            {bioError}
+                          </p>
+                        ) : null}
+                      </div>
+                    ) : (
+                      <p className="mt-2 max-w-xl text-sm text-neutral-700 [overflow-wrap:anywhere]">
+                        {isLoading ? "Loading profile..." : profile?.bio}
+                      </p>
+                    )}
 
                     {profile ? (
                       <div className="mt-4 flex flex-wrap items-center gap-4 text-xs text-neutral-500">
@@ -291,6 +408,8 @@ export default function ProfilePage({
 
                 <button
                   type="button"
+                  onClick={startEditingBio}
+                  disabled={!profile || isEditingBio || isLoading}
                   className="self-start rounded-lg border border-neutral-200 bg-neutral-100 px-4 py-2 text-sm font-semibold text-neutral-700 transition hover:border-neutral-300 hover:bg-neutral-200"
                 >
                   Edit Profile

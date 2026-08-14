@@ -57,7 +57,7 @@ export const countGuestUsers = () => {
   })
 }
 
-export const updateUser = (id: number, refreshToken: string) => {
+export const updateRefreshToken = (id: number, refreshToken: string) => {
   return client.user.update({
     where: { id },
     data: {
@@ -78,6 +78,29 @@ export const updateUser = (id: number, refreshToken: string) => {
 export const findUserByUserId = (id: number) => {
   return client.user.findUnique({
     where: { id },
+    select: {
+      id: true,
+      username: true,
+      bio: true,
+      avatarUrl: true,
+      rating: true,
+      gamesPlayed: true,
+      createdAt: true
+    }
+  })
+}
+
+
+export const updateUserProfile = (id: number,
+    data: {
+      username?: string
+      bio?: string
+      avatarUrl?: string
+    }
+  ) => {
+  return client.user.update({
+    where: { id },
+    data,
     select: {
       id: true,
       username: true,
