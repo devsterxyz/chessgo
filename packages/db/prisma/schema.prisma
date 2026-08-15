@@ -21,3 +21,25 @@ model User{
   rating       Int      @default(800)
   gamesPlayed  Int      @default(0)
 }
+
+model Game {
+  id            String    @id @default(cuid())
+
+  whitePlayerId String
+  blackPlayerId String
+
+  winnerId      String?
+
+  status        GameStatus
+
+  startedAt     DateTime
+  endedAt       DateTime?
+
+  createdAt     DateTime  @default(now())
+}
+
+enum GameStatus {
+  PLAYING
+  FINISHED
+  ABANDONED
+}

@@ -21,7 +21,7 @@ if (!connectionString) {
 
 const adapter = new PrismaPg({ connectionString })
 
-export const client = new PrismaClient({ adapter })
+export const client: PrismaClient = new PrismaClient({ adapter } as any)
 
 export const findUserByUsername = (username: string) => {
   return client.user.findUnique({
