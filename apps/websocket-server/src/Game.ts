@@ -2,9 +2,9 @@ import { Chess } from "chess.js";
 import type WebSocket from "ws";
 import { GAME_STARTED } from "./messages.js";
 
-type PlayerColor = "white" | "black"
+export type PlayerColor = "white" | "black"
 
-type GameOverPayload = {
+export type GameOverPayload = {
   checkmate?: boolean
   draw: boolean
   winner: PlayerColor | null
@@ -40,7 +40,7 @@ export class Game{
   private pendingDrawOfferBy: PlayerColor | null = null
   private positionHistory: string[] = []
   private moveHistory: MoveHistoryEntry[] = []
-  private onGameOver: (gameId: string) => void
+  private onGameOver: (gameId: string, payload: GameOverPayload) => void
 
   constructor(
     id: string,
@@ -49,7 +49,7 @@ export class Game{
     player1Id: number,
     player2Id: number,
     private readonly timeControl: TimeControl,
-    onGameOver: (gameId: string) => void,
+    onGameOver: (gameId: string, payload: GameOverPayload) => void,
   ){
     this.id = id
     this.player1 = player1
@@ -250,7 +250,7 @@ export class Game{
 
     this.sendToSocket(this.player1, gameOverMessage);
     this.sendToSocket(this.player2, gameOverMessage);
-    this.onGameOver(this.id)
+    this.onGameOver(this.id, payload)
   }
 
   private sendDrawMessage(type: string, payload: Record<string, unknown>) {

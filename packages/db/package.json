@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./user.db.ts"
+    ".": "./user.db.ts",
+    "./game": "./game.db.ts"
   },
   "scripts": {
     "db:generate": "prisma generate",

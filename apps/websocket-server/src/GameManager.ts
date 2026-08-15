@@ -1,7 +1,7 @@
 import type WebSocket from "ws"
-import { randomUUID } from "crypto"
 import jwt from "jsonwebtoken"
-import { Game, type TimeControl } from "./Game.js"
+import { createGame, finishGame } from "@repo/db/game"
+import { Game, type GameOverPayload, type PlayerColor, type TimeControl } from "./Game.js"
 import {
   CANCEL_MATCHMAKING,
   DRAW_ACCEPT,
@@ -33,6 +33,12 @@ type FinishedGame = {
   whiteSocket: WebSocket
   blackSocket: WebSocket
   timeControl: TimeControl
+}
+
+type ManagedGameOverPayload = GameOverPayload | {
+  draw: boolean
+  winner: PlayerColor | null
+  reason: "player_disconnected" | "both_players_disconnected"
 }
 
 const timeControls: Record<string, TimeControl> = {
@@ -279,6 +285,60 @@ export class GameManager{
     this.pendingRematches.delete(id)
   }
 
+  private getWinnerId(game: Game, winner: PlayerColor | null) {
+    if (winner === "white") return String(game.player1Id)
+    if (winner === "black") return String(game.player2Id)
+    return null
+  }
+
+  private persistFinishedGame(id: string, game: Game, payload: ManagedGameOverPayload) {
+    const status = payload.reason === "both_players_disconnected" ? "ABANDONED" : "FINISHED"
+
+    void finishGame(id, {
+      winnerId: this.getWinnerId(game, payload.winner),
+      status,
+    }).catch((error) => {
+      console.error(`Failed to update finished game ${id}:`, error)
+    })
+  }
+
+  private handleGameOver(id: string, payload: ManagedGameOverPayload) {
+    const game = this.games.get(id)
+    if (!game) return
+
+    this.archiveFinishedGame(id, game)
+    this.persistFinishedGame(id, game, payload)
+    this.deleteGame(id)
+  }
+
+  private async startGame(
+    whiteSocket: WebSocket,
+    blackSocket: WebSocket,
+    whiteUserId: number,
+    blackUserId: number,
+    timeControl: TimeControl,
+  ) {
+    const persistedGame = await createGame({
+      whitePlayerId: String(whiteUserId),
+      blackPlayerId: String(blackUserId),
+    })
+
+    const game = new Game(
+      persistedGame.id,
+      whiteSocket,
+      blackSocket,
+      whiteUserId,
+      blackUserId,
+      timeControl,
+      (finishedGameId, payload) => {
+        this.handleGameOver(finishedGameId, payload)
+      },
+    )
+
+    this.games.set(persistedGame.id, game)
+    return game
+  }
+
   private removeFinishedGamePlayer(socket: WebSocket, userId: number){
     const finishedEntry = Array.from(this.finishedGames.entries()).find(
       ([_id, finishedGame]) =>
@@ -310,14 +370,13 @@ export class GameManager{
 
   private endGame(id: string, payload: {
     draw: boolean
-    winner: "white" | "black" | null
+    winner: PlayerColor | null
     reason: "player_disconnected" | "both_players_disconnected"
   }){
     const game = this.games.get(id)
     if (!game) return
 
-    this.archiveFinishedGame(id, game)
-    this.deleteGame(id)
+    this.handleGameOver(id, payload)
 
     const message = JSON.stringify({
       type: "GAME_OVER",
@@ -423,7 +482,7 @@ export class GameManager{
     }))
   }
 
-  private acceptRematch(socket: WebSocket, gameId: unknown, accessToken: unknown, fallbackUserId: unknown){
+  private async acceptRematch(socket: WebSocket, gameId: unknown, accessToken: unknown, fallbackUserId: unknown){
     const userId = this.authenticateSocket(socket, accessToken, fallbackUserId)
     if (!userId) return
 
@@ -436,23 +495,25 @@ export class GameManager{
     this.pendingRematches.delete(finishedGame.id)
     this.finishedGames.delete(finishedGame.id)
 
-    const gameIdForRematch = randomUUID()
-    const game = new Game(
-      gameIdForRematch,
-      finishedGame.blackSocket,
-      finishedGame.whiteSocket,
-      finishedGame.blackUserId,
-      finishedGame.whiteUserId,
-      finishedGame.timeControl,
-      (finishedGameId) => {
-        const finished = this.games.get(finishedGameId)
-        if (finished) {
-          this.archiveFinishedGame(finishedGameId, finished)
-        }
-        this.deleteGame(finishedGameId)
-      },
-    )
-    this.games.set(gameIdForRematch, game)
+    try {
+      await this.startGame(
+        finishedGame.blackSocket,
+        finishedGame.whiteSocket,
+        finishedGame.blackUserId,
+        finishedGame.whiteUserId,
+        finishedGame.timeControl,
+      )
+    } catch (error) {
+      console.error("Failed to create rematch:", error)
+      for (const player of [finishedGame.whiteSocket, finishedGame.blackSocket]) {
+        player.send(JSON.stringify({
+          type: "GAME_START_FAILED",
+          payload: {
+            message: "Unable to create game",
+          },
+        }))
+      }
+    }
   }
 
   private declineRematch(socket: WebSocket, gameId: unknown, accessToken: unknown, fallbackUserId: unknown){
@@ -495,7 +556,7 @@ export class GameManager{
   }
 
   private addHandler(socket: WebSocket){
-    socket.on("message", (data)=>{
+    socket.on("message", async (data)=>{
       const message = JSON.parse(data.toString())
 
       if(message.type == RESUME_GAME){
@@ -542,7 +603,7 @@ export class GameManager{
       }
 
       if(message.type == REMATCH_ACCEPT){
-        this.acceptRematch(
+        await this.acceptRematch(
           socket,
           message.gameId ?? message.payload?.gameId,
           message.accessToken ?? message.payload?.accessToken,
@@ -600,24 +661,27 @@ export class GameManager{
             return
           }
 
-          const gameId = randomUUID()
-          const game = new Game(
-            gameId,
-            pendingUser.socket,
-            socket,
-            pendingUser.userId,
-            userId,
-            timeControl,
-            (finishedGameId) => {
-              const finished = this.games.get(finishedGameId)
-              if (finished) {
-                this.archiveFinishedGame(finishedGameId, finished)
-              }
-              this.deleteGame(finishedGameId)
-            },
-          )
-          this.games.set(gameId, game)
           this.pendingUsers.delete(matchmakingKey)
+
+          try {
+            await this.startGame(
+              pendingUser.socket,
+              socket,
+              pendingUser.userId,
+              userId,
+              timeControl,
+            )
+          } catch (error) {
+            console.error("Failed to create matched game:", error)
+            for (const player of [pendingUser.socket, socket]) {
+              player.send(JSON.stringify({
+                type: "GAME_START_FAILED",
+                payload: {
+                  message: "Unable to create game",
+                },
+              }))
+            }
+          }
         }
         else{
           this.pendingUsers.set(matchmakingKey, { socket, userId, timeControl, rated })
