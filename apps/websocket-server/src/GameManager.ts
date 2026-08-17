@@ -35,30 +35,92 @@ type FinishedGame = {
   timeControl: TimeControl
 }
 
-type ManagedGameOverPayload = GameOverPayload | {
-  draw: boolean
-  winner: PlayerColor | null
-  reason: "player_disconnected" | "both_players_disconnected"
-}
+type ManagedGameOverPayload =
+  | GameOverPayload
+  | {
+      draw: boolean
+      winner: PlayerColor | null
+      reason: "player_disconnected" | "both_players_disconnected"
+    }
 
 const timeControls: Record<string, TimeControl> = {
-  "1+0": { id: "1+0", label: "1 min", initialTimeMs: 1 * 60 * 1000, incrementMs: 0 },
-  "1+1": { id: "1+1", label: "1 + 1", initialTimeMs: 1 * 60 * 1000, incrementMs: 1 * 1000 },
-  "2+1": { id: "2+1", label: "2 + 1", initialTimeMs: 2 * 60 * 1000, incrementMs: 1 * 1000 },
-  "3+0": { id: "3+0", label: "3 min", initialTimeMs: 3 * 60 * 1000, incrementMs: 0 },
-  "3+2": { id: "3+2", label: "3 + 2", initialTimeMs: 3 * 60 * 1000, incrementMs: 2 * 1000 },
-  "5+0": { id: "5+0", label: "5 min", initialTimeMs: 5 * 60 * 1000, incrementMs: 0 },
-  "10+0": { id: "10+0", label: "10 min", initialTimeMs: 10 * 60 * 1000, incrementMs: 0 },
-  "10+5": { id: "10+5", label: "10 + 5", initialTimeMs: 10 * 60 * 1000, incrementMs: 5 * 1000 },
-  "15+10": { id: "15+10", label: "15 + 10", initialTimeMs: 15 * 60 * 1000, incrementMs: 10 * 1000 },
-  "1d+0": { id: "1d+0", label: "1 day", initialTimeMs: 24 * 60 * 60 * 1000, incrementMs: 0 },
-  "3d+0": { id: "3d+0", label: "3 days", initialTimeMs: 3 * 24 * 60 * 60 * 1000, incrementMs: 0 },
-  "7d+0": { id: "7d+0", label: "7 days", initialTimeMs: 7 * 24 * 60 * 60 * 1000, incrementMs: 0 },
+  "1+0": {
+    id: "1+0",
+    label: "1 min",
+    initialTimeMs: 1 * 60 * 1000,
+    incrementMs: 0,
+  },
+  "1+1": {
+    id: "1+1",
+    label: "1 + 1",
+    initialTimeMs: 1 * 60 * 1000,
+    incrementMs: 1 * 1000,
+  },
+  "2+1": {
+    id: "2+1",
+    label: "2 + 1",
+    initialTimeMs: 2 * 60 * 1000,
+    incrementMs: 1 * 1000,
+  },
+  "3+0": {
+    id: "3+0",
+    label: "3 min",
+    initialTimeMs: 3 * 60 * 1000,
+    incrementMs: 0,
+  },
+  "3+2": {
+    id: "3+2",
+    label: "3 + 2",
+    initialTimeMs: 3 * 60 * 1000,
+    incrementMs: 2 * 1000,
+  },
+  "5+0": {
+    id: "5+0",
+    label: "5 min",
+    initialTimeMs: 5 * 60 * 1000,
+    incrementMs: 0,
+  },
+  "10+0": {
+    id: "10+0",
+    label: "10 min",
+    initialTimeMs: 10 * 60 * 1000,
+    incrementMs: 0,
+  },
+  "10+5": {
+    id: "10+5",
+    label: "10 + 5",
+    initialTimeMs: 10 * 60 * 1000,
+    incrementMs: 5 * 1000,
+  },
+  "15+10": {
+    id: "15+10",
+    label: "15 + 10",
+    initialTimeMs: 15 * 60 * 1000,
+    incrementMs: 10 * 1000,
+  },
+  "1d+0": {
+    id: "1d+0",
+    label: "1 day",
+    initialTimeMs: 24 * 60 * 60 * 1000,
+    incrementMs: 0,
+  },
+  "3d+0": {
+    id: "3d+0",
+    label: "3 days",
+    initialTimeMs: 3 * 24 * 60 * 60 * 1000,
+    incrementMs: 0,
+  },
+  "7d+0": {
+    id: "7d+0",
+    label: "7 days",
+    initialTimeMs: 7 * 24 * 60 * 60 * 1000,
+    incrementMs: 0,
+  },
 }
 
 const defaultTimeControl = timeControls["5+0"]!
 
-export class GameManager{
+export class GameManager {
   private games: Map<string, Game>
   private pendingUsers: Map<string, PendingUser>
   private users: WebSocket[]
@@ -69,7 +131,7 @@ export class GameManager{
   private pendingRematches: Map<string, number>
   private readonly disconnectGraceMs = 10_000
 
-  constructor(){
+  constructor() {
     this.games = new Map()
     this.pendingUsers = new Map()
     this.users = []
@@ -80,13 +142,13 @@ export class GameManager{
     this.pendingRematches = new Map()
   }
 
-  addUser(socket: WebSocket){
+  addUser(socket: WebSocket) {
     this.users.push(socket)
     this.addHandler(socket)
   }
 
-  removeUser(socket: WebSocket){
-    this.users = this.users.filter(user => user != socket)
+  removeUser(socket: WebSocket) {
+    this.users = this.users.filter((user) => user != socket)
     const userId = this.socketUserIds.get(socket)
     this.socketUserIds.delete(socket)
 
@@ -100,9 +162,7 @@ export class GameManager{
 
     this.removeFinishedGamePlayer(socket, userId)
 
-    const entry = Array.from(this.games.entries()).find(([_id, game]) =>
-      game.isPlayer(userId) && game.getPlayerSocket(userId) === socket
-    )
+    const entry = Array.from(this.games.entries()).find(([_id, game]) => game.isPlayer(userId) && game.getPlayerSocket(userId) === socket)
 
     if (entry) {
       const [id, game] = entry
@@ -142,11 +202,13 @@ export class GameManager{
     }
   }
 
-  private getUserIdFromAuth(accessToken: unknown, fallbackUserId: unknown){
+  private getUserIdFromAuth(accessToken: unknown, fallbackUserId: unknown) {
     const jwtSecret = process.env.JWT_SECRET_KEY
     if (typeof accessToken === "string" && accessToken.trim() !== "" && jwtSecret) {
       try {
-        const decoded = jwt.verify(accessToken, jwtSecret) as jwt.JwtPayload & { userId?: number }
+        const decoded = jwt.verify(accessToken, jwtSecret) as jwt.JwtPayload & {
+          userId?: number
+        }
         if (typeof decoded.userId === "number") {
           return decoded.userId
         }
@@ -155,21 +217,22 @@ export class GameManager{
       }
     }
 
-    const numericUserId =
-      typeof fallbackUserId === "number" ? fallbackUserId : Number(fallbackUserId)
+    const numericUserId = typeof fallbackUserId === "number" ? fallbackUserId : Number(fallbackUserId)
 
     return Number.isFinite(numericUserId) && numericUserId > 0 ? numericUserId : null
   }
 
-  private authenticateSocket(socket: WebSocket, accessToken: unknown, fallbackUserId: unknown){
+  private authenticateSocket(socket: WebSocket, accessToken: unknown, fallbackUserId: unknown) {
     const userId = this.getUserIdFromAuth(accessToken, fallbackUserId)
     if (!userId) {
-      socket.send(JSON.stringify({
-        type: "AUTH_ERROR",
-        payload: {
-          message: "Invalid access token",
-        },
-      }))
+      socket.send(
+        JSON.stringify({
+          type: "AUTH_ERROR",
+          payload: {
+            message: "Invalid access token",
+          },
+        }),
+      )
       return null
     }
 
@@ -186,7 +249,7 @@ export class GameManager{
     return `${timeControlId}:${rated ? "rated" : "casual"}`
   }
 
-  private resumeGame(socket: WebSocket, gameId: unknown, accessToken: unknown, fallbackUserId: unknown){
+  private resumeGame(socket: WebSocket, gameId: unknown, accessToken: unknown, fallbackUserId: unknown) {
     if (typeof gameId !== "string") return
 
     const userId = this.authenticateSocket(socket, accessToken, fallbackUserId)
@@ -195,17 +258,19 @@ export class GameManager{
     const game = this.games.get(gameId)
 
     if (!game || !game.isPlayer(userId)) {
-      socket.send(JSON.stringify({
-        type: "RESUME_FAILED",
-        payload: {},
-      }))
+      socket.send(
+        JSON.stringify({
+          type: "RESUME_FAILED",
+          payload: {},
+        }),
+      )
       return
     }
 
     this.reconnectPlayerToGame(gameId, game, userId, socket)
   }
 
-  private reconnectPlayerToGame(gameId: string, game: Game, userId: number, socket: WebSocket){
+  private reconnectPlayerToGame(gameId: string, game: Game, userId: number, socket: WebSocket) {
     const didReplacePlayer = game.replacePlayer(userId, socket)
     if (!didReplacePlayer) return false
 
@@ -225,17 +290,19 @@ export class GameManager{
     return true
   }
 
-  private sendActiveGame(socket: WebSocket, accessToken: unknown, fallbackUserId: unknown){
+  private sendActiveGame(socket: WebSocket, accessToken: unknown, fallbackUserId: unknown) {
     const userId = this.authenticateSocket(socket, accessToken, fallbackUserId)
     if (!userId) return
 
     const entry = Array.from(this.games.entries()).find(([_id, game]) => game.isPlayer(userId))
 
     if (!entry) {
-      socket.send(JSON.stringify({
-        type: "NO_ACTIVE_GAME",
-        payload: {},
-      }))
+      socket.send(
+        JSON.stringify({
+          type: "NO_ACTIVE_GAME",
+          payload: {},
+        }),
+      )
       return
     }
 
@@ -243,7 +310,7 @@ export class GameManager{
     this.reconnectPlayerToGame(gameId, game, userId, socket)
   }
 
-  private cancelMatchmaking(socket: WebSocket, accessToken: unknown, fallbackUserId: unknown){
+  private cancelMatchmaking(socket: WebSocket, accessToken: unknown, fallbackUserId: unknown) {
     const userId = this.authenticateSocket(socket, accessToken, fallbackUserId)
     if (!userId) return
 
@@ -253,13 +320,15 @@ export class GameManager{
       }
     }
 
-    socket.send(JSON.stringify({
-      type: "MATCHMAKING_CANCELLED",
-      payload: {},
-    }))
+    socket.send(
+      JSON.stringify({
+        type: "MATCHMAKING_CANCELLED",
+        payload: {},
+      }),
+    )
   }
 
-  private deleteGame(id: string){
+  private deleteGame(id: string) {
     const game = this.games.get(id)
     game?.dispose()
 
@@ -273,7 +342,7 @@ export class GameManager{
     this.games.delete(id)
   }
 
-  private archiveFinishedGame(id: string, game: Game){
+  private archiveFinishedGame(id: string, game: Game) {
     this.finishedGames.set(id, {
       id,
       whiteUserId: game.player1Id,
@@ -297,6 +366,7 @@ export class GameManager{
     void finishGame(id, {
       winnerId: this.getWinnerId(game, payload.winner),
       status,
+      moves: game.moveCount,
     }).catch((error) => {
       console.error(`Failed to update finished game ${id}:`, error)
     })
@@ -311,41 +381,23 @@ export class GameManager{
     this.deleteGame(id)
   }
 
-  private async startGame(
-    whiteSocket: WebSocket,
-    blackSocket: WebSocket,
-    whiteUserId: number,
-    blackUserId: number,
-    timeControl: TimeControl,
-  ) {
+  private async startGame(whiteSocket: WebSocket, blackSocket: WebSocket, whiteUserId: number, blackUserId: number, timeControl: TimeControl) {
     const persistedGame = await createGame({
       whitePlayerId: String(whiteUserId),
       blackPlayerId: String(blackUserId),
     })
 
-    const game = new Game(
-      persistedGame.id,
-      whiteSocket,
-      blackSocket,
-      whiteUserId,
-      blackUserId,
-      timeControl,
-      (finishedGameId, payload) => {
-        this.handleGameOver(finishedGameId, payload)
-      },
-    )
+    const game = new Game(persistedGame.id, whiteSocket, blackSocket, whiteUserId, blackUserId, timeControl, (finishedGameId, payload) => {
+      this.handleGameOver(finishedGameId, payload)
+    })
 
     this.games.set(persistedGame.id, game)
     return game
   }
 
-  private removeFinishedGamePlayer(socket: WebSocket, userId: number){
+  private removeFinishedGamePlayer(socket: WebSocket, userId: number) {
     const finishedEntry = Array.from(this.finishedGames.entries()).find(
-      ([_id, finishedGame]) =>
-        (finishedGame.whiteUserId === userId &&
-          finishedGame.whiteSocket === socket) ||
-        (finishedGame.blackUserId === userId &&
-          finishedGame.blackSocket === socket),
+      ([_id, finishedGame]) => (finishedGame.whiteUserId === userId && finishedGame.whiteSocket === socket) || (finishedGame.blackUserId === userId && finishedGame.blackSocket === socket),
     )
 
     if (!finishedEntry) return
@@ -357,22 +409,27 @@ export class GameManager{
     this.pendingRematches.delete(gameId)
 
     try {
-      opponent.socket.send(JSON.stringify({
-        type: "REMATCH_UNAVAILABLE",
-        payload: {
-          gameId,
-        },
-      }))
+      opponent.socket.send(
+        JSON.stringify({
+          type: "REMATCH_UNAVAILABLE",
+          payload: {
+            gameId,
+          },
+        }),
+      )
     } catch {
       // The opponent may already be gone too.
     }
   }
 
-  private endGame(id: string, payload: {
-    draw: boolean
-    winner: PlayerColor | null
-    reason: "player_disconnected" | "both_players_disconnected"
-  }){
+  private endGame(
+    id: string,
+    payload: {
+      draw: boolean
+      winner: PlayerColor | null
+      reason: "player_disconnected" | "both_players_disconnected"
+    },
+  ) {
     const game = this.games.get(id)
     if (!game) return
 
@@ -396,9 +453,7 @@ export class GameManager{
     const userId = this.socketUserIds.get(socket)
     if (!userId) return null
 
-    return Array.from(this.games.values()).find(game =>
-      game.isPlayer(userId) && game.getPlayerSocket(userId) === socket
-    ) ?? null
+    return Array.from(this.games.values()).find((game) => game.isPlayer(userId) && game.getPlayerSocket(userId) === socket) ?? null
   }
 
   private getFinishedGameForUser(gameId: unknown, userId: number) {
@@ -406,10 +461,7 @@ export class GameManager{
 
     const finishedGame = this.finishedGames.get(gameId)
     if (!finishedGame) return null
-    if (
-      finishedGame.whiteUserId !== userId &&
-      finishedGame.blackUserId !== userId
-    ) {
+    if (finishedGame.whiteUserId !== userId && finishedGame.blackUserId !== userId) {
       return null
     }
 
@@ -430,7 +482,7 @@ export class GameManager{
     }
   }
 
-  private requestRematch(socket: WebSocket, gameId: unknown, accessToken: unknown, fallbackUserId: unknown){
+  private requestRematch(socket: WebSocket, gameId: unknown, accessToken: unknown, fallbackUserId: unknown) {
     const userId = this.authenticateSocket(socket, accessToken, fallbackUserId)
     if (!userId) return
 
@@ -440,23 +492,27 @@ export class GameManager{
     this.pendingRematches.set(finishedGame.id, userId)
     const opponent = this.getFinishedGameOpponent(finishedGame, userId)
 
-    socket.send(JSON.stringify({
-      type: "REMATCH_WAITING",
-      payload: {
-        gameId: finishedGame.id,
-      },
-    }))
+    socket.send(
+      JSON.stringify({
+        type: "REMATCH_WAITING",
+        payload: {
+          gameId: finishedGame.id,
+        },
+      }),
+    )
 
-    opponent.socket.send(JSON.stringify({
-      type: "REMATCH_REQUESTED",
-      payload: {
-        gameId: finishedGame.id,
-        requestedBy: userId,
-      },
-    }))
+    opponent.socket.send(
+      JSON.stringify({
+        type: "REMATCH_REQUESTED",
+        payload: {
+          gameId: finishedGame.id,
+          requestedBy: userId,
+        },
+      }),
+    )
   }
 
-  private cancelRematch(socket: WebSocket, gameId: unknown, accessToken: unknown, fallbackUserId: unknown){
+  private cancelRematch(socket: WebSocket, gameId: unknown, accessToken: unknown, fallbackUserId: unknown) {
     const userId = this.authenticateSocket(socket, accessToken, fallbackUserId)
     if (!userId) return
 
@@ -467,22 +523,26 @@ export class GameManager{
     this.pendingRematches.delete(finishedGame.id)
     const opponent = this.getFinishedGameOpponent(finishedGame, userId)
 
-    socket.send(JSON.stringify({
-      type: "REMATCH_CANCELLED",
-      payload: {
-        gameId: finishedGame.id,
-      },
-    }))
+    socket.send(
+      JSON.stringify({
+        type: "REMATCH_CANCELLED",
+        payload: {
+          gameId: finishedGame.id,
+        },
+      }),
+    )
 
-    opponent.socket.send(JSON.stringify({
-      type: "REMATCH_REQUEST_CANCELLED",
-      payload: {
-        gameId: finishedGame.id,
-      },
-    }))
+    opponent.socket.send(
+      JSON.stringify({
+        type: "REMATCH_REQUEST_CANCELLED",
+        payload: {
+          gameId: finishedGame.id,
+        },
+      }),
+    )
   }
 
-  private async acceptRematch(socket: WebSocket, gameId: unknown, accessToken: unknown, fallbackUserId: unknown){
+  private async acceptRematch(socket: WebSocket, gameId: unknown, accessToken: unknown, fallbackUserId: unknown) {
     const userId = this.authenticateSocket(socket, accessToken, fallbackUserId)
     if (!userId) return
 
@@ -496,27 +556,23 @@ export class GameManager{
     this.finishedGames.delete(finishedGame.id)
 
     try {
-      await this.startGame(
-        finishedGame.blackSocket,
-        finishedGame.whiteSocket,
-        finishedGame.blackUserId,
-        finishedGame.whiteUserId,
-        finishedGame.timeControl,
-      )
+      await this.startGame(finishedGame.blackSocket, finishedGame.whiteSocket, finishedGame.blackUserId, finishedGame.whiteUserId, finishedGame.timeControl)
     } catch (error) {
       console.error("Failed to create rematch:", error)
       for (const player of [finishedGame.whiteSocket, finishedGame.blackSocket]) {
-        player.send(JSON.stringify({
-          type: "GAME_START_FAILED",
-          payload: {
-            message: "Unable to create game",
-          },
-        }))
+        player.send(
+          JSON.stringify({
+            type: "GAME_START_FAILED",
+            payload: {
+              message: "Unable to create game",
+            },
+          }),
+        )
       }
     }
   }
 
-  private declineRematch(socket: WebSocket, gameId: unknown, accessToken: unknown, fallbackUserId: unknown){
+  private declineRematch(socket: WebSocket, gameId: unknown, accessToken: unknown, fallbackUserId: unknown) {
     const userId = this.authenticateSocket(socket, accessToken, fallbackUserId)
     if (!userId) return
 
@@ -529,23 +585,27 @@ export class GameManager{
     this.pendingRematches.delete(finishedGame.id)
     const requester = this.getFinishedGameOpponent(finishedGame, userId)
 
-    requester.socket.send(JSON.stringify({
-      type: "REMATCH_DECLINED",
-      payload: {
-        gameId: finishedGame.id,
-        declinedBy: userId,
-      },
-    }))
+    requester.socket.send(
+      JSON.stringify({
+        type: "REMATCH_DECLINED",
+        payload: {
+          gameId: finishedGame.id,
+          declinedBy: userId,
+        },
+      }),
+    )
 
-    socket.send(JSON.stringify({
-      type: "REMATCH_DECLINE_SENT",
-      payload: {
-        gameId: finishedGame.id,
-      },
-    }))
+    socket.send(
+      JSON.stringify({
+        type: "REMATCH_DECLINE_SENT",
+        payload: {
+          gameId: finishedGame.id,
+        },
+      }),
+    )
   }
 
-  private leaveFinishedGame(socket: WebSocket, gameId: unknown, accessToken: unknown, fallbackUserId: unknown){
+  private leaveFinishedGame(socket: WebSocket, gameId: unknown, accessToken: unknown, fallbackUserId: unknown) {
     const userId = this.authenticateSocket(socket, accessToken, fallbackUserId)
     if (!userId) return
 
@@ -555,86 +615,44 @@ export class GameManager{
     this.removeFinishedGamePlayer(socket, userId)
   }
 
-  private addHandler(socket: WebSocket){
-    socket.on("message", async (data)=>{
+  private addHandler(socket: WebSocket) {
+    socket.on("message", async (data) => {
       const message = JSON.parse(data.toString())
 
-      if(message.type == RESUME_GAME){
-        this.resumeGame(
-          socket,
-          message.gameId ?? message.payload?.gameId,
-          message.accessToken ?? message.payload?.accessToken,
-          message.userId ?? message.payload?.userId,
-        )
+      if (message.type == RESUME_GAME) {
+        this.resumeGame(socket, message.gameId ?? message.payload?.gameId, message.accessToken ?? message.payload?.accessToken, message.userId ?? message.payload?.userId)
       }
 
-      if(message.type == GET_ACTIVE_GAME){
-        this.sendActiveGame(
-          socket,
-          message.accessToken ?? message.payload?.accessToken,
-          message.userId ?? message.payload?.userId,
-        )
+      if (message.type == GET_ACTIVE_GAME) {
+        this.sendActiveGame(socket, message.accessToken ?? message.payload?.accessToken, message.userId ?? message.payload?.userId)
       }
 
-      if(message.type == CANCEL_MATCHMAKING){
-        this.cancelMatchmaking(
-          socket,
-          message.accessToken ?? message.payload?.accessToken,
-          message.userId ?? message.payload?.userId,
-        )
+      if (message.type == CANCEL_MATCHMAKING) {
+        this.cancelMatchmaking(socket, message.accessToken ?? message.payload?.accessToken, message.userId ?? message.payload?.userId)
       }
 
-      if(message.type == REMATCH_REQUEST){
-        this.requestRematch(
-          socket,
-          message.gameId ?? message.payload?.gameId,
-          message.accessToken ?? message.payload?.accessToken,
-          message.userId ?? message.payload?.userId,
-        )
+      if (message.type == REMATCH_REQUEST) {
+        this.requestRematch(socket, message.gameId ?? message.payload?.gameId, message.accessToken ?? message.payload?.accessToken, message.userId ?? message.payload?.userId)
       }
 
-      if(message.type == REMATCH_CANCEL){
-        this.cancelRematch(
-          socket,
-          message.gameId ?? message.payload?.gameId,
-          message.accessToken ?? message.payload?.accessToken,
-          message.userId ?? message.payload?.userId,
-        )
+      if (message.type == REMATCH_CANCEL) {
+        this.cancelRematch(socket, message.gameId ?? message.payload?.gameId, message.accessToken ?? message.payload?.accessToken, message.userId ?? message.payload?.userId)
       }
 
-      if(message.type == REMATCH_ACCEPT){
-        await this.acceptRematch(
-          socket,
-          message.gameId ?? message.payload?.gameId,
-          message.accessToken ?? message.payload?.accessToken,
-          message.userId ?? message.payload?.userId,
-        )
+      if (message.type == REMATCH_ACCEPT) {
+        await this.acceptRematch(socket, message.gameId ?? message.payload?.gameId, message.accessToken ?? message.payload?.accessToken, message.userId ?? message.payload?.userId)
       }
 
-      if(message.type == REMATCH_DECLINE){
-        this.declineRematch(
-          socket,
-          message.gameId ?? message.payload?.gameId,
-          message.accessToken ?? message.payload?.accessToken,
-          message.userId ?? message.payload?.userId,
-        )
+      if (message.type == REMATCH_DECLINE) {
+        this.declineRematch(socket, message.gameId ?? message.payload?.gameId, message.accessToken ?? message.payload?.accessToken, message.userId ?? message.payload?.userId)
       }
 
-      if(message.type == LEAVE_FINISHED_GAME){
-        this.leaveFinishedGame(
-          socket,
-          message.gameId ?? message.payload?.gameId,
-          message.accessToken ?? message.payload?.accessToken,
-          message.userId ?? message.payload?.userId,
-        )
+      if (message.type == LEAVE_FINISHED_GAME) {
+        this.leaveFinishedGame(socket, message.gameId ?? message.payload?.gameId, message.accessToken ?? message.payload?.accessToken, message.userId ?? message.payload?.userId)
       }
 
-      if(message.type == INIT_GAME){
-        const userId = this.authenticateSocket(
-          socket,
-          message.accessToken ?? message.payload?.accessToken,
-          message.userId ?? message.payload?.userId,
-        )
+      if (message.type == INIT_GAME) {
+        const userId = this.authenticateSocket(socket, message.accessToken ?? message.payload?.accessToken, message.userId ?? message.payload?.userId)
         if (!userId) return
         const timeControl = this.getTimeControl(message.timeControlId ?? message.payload?.timeControlId)
         const rated = Boolean(message.rated ?? message.payload?.rated)
@@ -648,56 +666,65 @@ export class GameManager{
         }
 
         const pendingUser = this.pendingUsers.get(matchmakingKey)
-        if(pendingUser){
+        if (pendingUser) {
           if (pendingUser.userId === userId) {
-            this.pendingUsers.set(matchmakingKey, { socket, userId, timeControl, rated })
-            socket.send(JSON.stringify({
-              type: "WAITING_FOR_OPPONENT",
-              payload: {
-                timeControl,
-                rated,
-              },
-            }))
+            this.pendingUsers.set(matchmakingKey, {
+              socket,
+              userId,
+              timeControl,
+              rated,
+            })
+            socket.send(
+              JSON.stringify({
+                type: "WAITING_FOR_OPPONENT",
+                payload: {
+                  timeControl,
+                  rated,
+                },
+              }),
+            )
             return
           }
 
           this.pendingUsers.delete(matchmakingKey)
 
           try {
-            await this.startGame(
-              pendingUser.socket,
-              socket,
-              pendingUser.userId,
-              userId,
-              timeControl,
-            )
+            await this.startGame(pendingUser.socket, socket, pendingUser.userId, userId, timeControl)
           } catch (error) {
             console.error("Failed to create matched game:", error)
             for (const player of [pendingUser.socket, socket]) {
-              player.send(JSON.stringify({
-                type: "GAME_START_FAILED",
-                payload: {
-                  message: "Unable to create game",
-                },
-              }))
+              player.send(
+                JSON.stringify({
+                  type: "GAME_START_FAILED",
+                  payload: {
+                    message: "Unable to create game",
+                  },
+                }),
+              )
             }
           }
-        }
-        else{
-          this.pendingUsers.set(matchmakingKey, { socket, userId, timeControl, rated })
-          socket.send(JSON.stringify({
-            type: "WAITING_FOR_OPPONENT",
-            payload: {
-              timeControl,
-              rated,
-            },
-          }))
+        } else {
+          this.pendingUsers.set(matchmakingKey, {
+            socket,
+            userId,
+            timeControl,
+            rated,
+          })
+          socket.send(
+            JSON.stringify({
+              type: "WAITING_FOR_OPPONENT",
+              payload: {
+                timeControl,
+                rated,
+              },
+            }),
+          )
         }
       }
 
-      if(message.type == MOVE){
+      if (message.type == MOVE) {
         const game = this.getActiveGameForSocket(socket)
-        if(game){
+        if (game) {
           const didEndGame = game.makeMove(socket, message.move)
           if (didEndGame) {
             this.deleteGame(game.id)
@@ -705,9 +732,9 @@ export class GameManager{
         }
       }
 
-      if(message.type == RESIGN_GAME){
+      if (message.type == RESIGN_GAME) {
         const game = this.getActiveGameForSocket(socket)
-        if(game){
+        if (game) {
           const didEndGame = game.resign(socket)
           if (didEndGame) {
             this.deleteGame(game.id)
@@ -715,9 +742,9 @@ export class GameManager{
         }
       }
 
-      if(message.type == DRAW_OFFER){
+      if (message.type == DRAW_OFFER) {
         const game = this.getActiveGameForSocket(socket)
-        if(game){
+        if (game) {
           const didEndGame = game.offerDraw(socket)
           if (didEndGame) {
             this.deleteGame(game.id)
@@ -725,9 +752,9 @@ export class GameManager{
         }
       }
 
-      if(message.type == DRAW_ACCEPT){
+      if (message.type == DRAW_ACCEPT) {
         const game = this.getActiveGameForSocket(socket)
-        if(game){
+        if (game) {
           const didEndGame = game.acceptDraw(socket)
           if (didEndGame) {
             this.deleteGame(game.id)
@@ -735,9 +762,9 @@ export class GameManager{
         }
       }
 
-      if(message.type == DRAW_DECLINE){
+      if (message.type == DRAW_DECLINE) {
         const game = this.getActiveGameForSocket(socket)
-        if(game){
+        if (game) {
           game.declineDraw(socket)
         }
       }

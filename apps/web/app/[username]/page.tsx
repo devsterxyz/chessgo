@@ -3,8 +3,7 @@
 import { use, useEffect, useMemo, useState } from "react";
 import { Navbar } from "../Navbar";
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3002";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3002";
 
 type Rating = {
   rating: number;
@@ -19,6 +18,15 @@ type UserProfile = {
   joinedDate: string;
   rating: Rating;
   gamesPlayed: number;
+};
+
+type GameHistoryItem = {
+  id: string;
+  whiteUsername: string;
+  blackUsername: string;
+  winnerUsername: string | null;
+  moves: number;
+  date: string | Date;
 };
 
 type ApiRating = {
@@ -43,6 +51,11 @@ type ProfileResponse = {
   user?: ApiUserProfile;
 };
 
+type GameHistoryResponse = {
+  message?: string;
+  games?: GameHistoryItem[];
+};
+
 const MAX_BIO_LENGTH = 200;
 
 function formatJoinedDate(createdAt?: string | Date | null) {
@@ -65,11 +78,19 @@ function formatJoinedDate(createdAt?: string | Date | null) {
 
 function extractRating(rating?: number | ApiRating | null): Rating {
   if (rating == null) {
-    return { rating: 800, delta: 0, sparkline: Array.from({ length: 8 }, () => 800) };
+    return {
+      rating: 800,
+      delta: 0,
+      sparkline: Array.from({ length: 8 }, () => 800),
+    };
   }
 
   if (typeof rating === "number") {
-    return { rating, delta: 0, sparkline: Array.from({ length: 8 }, () => rating) };
+    return {
+      rating,
+      delta: 0,
+      sparkline: Array.from({ length: 8 }, () => rating),
+    };
   }
 
   const value = rating.rating ?? 800;
@@ -99,13 +120,21 @@ function getInitials(username: string) {
   return username.trim().slice(0, 2).toUpperCase() || "CG";
 }
 
-function Sparkline({
-  data,
-  color,
-}: {
-  data: number[];
-  color: string;
-}) {
+function formatGameDate(value: string | Date) {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "Unknown";
+  }
+
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  }).format(date);
+}
+
+function Sparkline({ data, color }: { data: number[]; color: string }) {
   if (data.length < 2) {
     return <div className="h-9 rounded bg-neutral-100" />;
   }
@@ -143,6 +172,104 @@ function Sparkline({
   );
 }
 
+function GameHistorySection({
+  games,
+  isLoading,
+  errorMessage,
+}: {
+  games: GameHistoryItem[];
+  isLoading: boolean;
+  errorMessage: string;
+}) {
+  return (
+    <section className="rounded-2xl border border-neutral-200 bg-white p-5 shadow-xl shadow-neutral-200/70">
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-700">
+          Game History
+        </h2>
+        <span className="rounded-full bg-neutral-100 px-2.5 py-0.5 text-xs font-bold text-neutral-500">
+          {games.length.toLocaleString()} games
+        </span>
+      </div>
+
+      {isLoading ? (
+        <div className="mt-6 flex flex-col items-center justify-center py-10 text-center">
+          <div className="h-12 w-12 animate-pulse rounded-xl bg-neutral-100" />
+          <p className="mt-3 text-sm font-medium text-neutral-500">
+            Loading games...
+          </p>
+        </div>
+      ) : errorMessage ? (
+        <p className="mt-5 rounded-lg bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">
+          {errorMessage}
+        </p>
+      ) : games.length === 0 ? (
+        <div className="mt-6 flex flex-col items-center justify-center py-10 text-center">
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-neutral-100 font-mono text-xl font-bold text-neutral-400">
+            CG
+          </div>
+          <p className="mt-3 text-sm font-medium text-neutral-500">
+            No games recorded yet.
+          </p>
+        </div>
+      ) : (
+        <div className="mt-5 overflow-hidden rounded-xl border border-neutral-100">
+          <div className="hidden grid-cols-[minmax(220px,1fr)_180px_90px_140px] bg-neutral-50 px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-neutral-500 md:grid">
+            <span>Players</span>
+            <span>Winner</span>
+            <span className="text-right">Moves</span>
+            <span className="text-right">Date</span>
+          </div>
+
+          <div className="divide-y divide-neutral-100">
+            {games.map((game) => (
+              <div
+                key={game.id}
+                className="grid gap-3 px-4 py-3 text-sm md:grid-cols-[minmax(220px,1fr)_180px_90px_140px] md:items-center"
+              >
+                <div className="flex min-w-0 flex-col gap-1">
+                  <span className="truncate font-bold text-neutral-950">
+                    {game.whiteUsername}
+                  </span>
+                  <span className="truncate font-bold text-neutral-600">
+                    {game.blackUsername}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between gap-2 md:block">
+                  <span className="text-xs font-bold uppercase tracking-wider text-neutral-400 md:hidden">
+                    Winner
+                  </span>
+                  <span className="font-bold text-emerald-700">
+                    {game.winnerUsername ?? "Draw"}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between gap-2 md:block md:text-right">
+                  <span className="text-xs font-bold uppercase tracking-wider text-neutral-400 md:hidden">
+                    Moves
+                  </span>
+                  <span className="font-semibold tabular-nums text-neutral-700">
+                    {game.moves}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between gap-2 md:block md:text-right">
+                  <span className="text-xs font-bold uppercase tracking-wider text-neutral-400 md:hidden">
+                    Date
+                  </span>
+                  <span className="font-medium text-neutral-500">
+                    {formatGameDate(game.date)}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
 
 function RatingCard({ rating }: { rating: Rating }) {
   const isPositive = rating.delta > 0;
@@ -195,6 +322,9 @@ export default function ProfilePage({
   const [bioDraft, setBioDraft] = useState("");
   const [bioError, setBioError] = useState("");
   const [isSavingBio, setIsSavingBio] = useState(false);
+  const [gameHistory, setGameHistory] = useState<GameHistoryItem[]>([]);
+  const [gameHistoryError, setGameHistoryError] = useState("");
+  const [isGameHistoryLoading, setIsGameHistoryLoading] = useState(true);
   const displayName = profile?.username ?? username;
   const initials = useMemo(() => getInitials(displayName), [displayName]);
 
@@ -255,7 +385,7 @@ export default function ProfilePage({
         const user = JSON.parse(storedUser) as Record<string, unknown>;
         localStorage.setItem(
           "chessgo_user",
-          JSON.stringify({ ...user, ...data.user })
+          JSON.stringify({ ...user, ...data.user }),
         );
       }
     } catch {
@@ -313,6 +443,44 @@ export default function ProfilePage({
 
     return () => controller.abort();
   }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    async function loadGameHistory() {
+      setIsGameHistoryLoading(true);
+      setGameHistoryError("");
+
+      try {
+        const response = await fetch(
+          `${API_BASE_URL}/game/history/${encodeURIComponent(username)}`,
+          { signal: controller.signal },
+        );
+        const data = (await response.json()) as GameHistoryResponse;
+
+        if (!response.ok || !data.games) {
+          setGameHistory([]);
+          setGameHistoryError(data.message ?? "Unable to load games.");
+          return;
+        }
+
+        setGameHistory(data.games);
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") {
+          return;
+        }
+
+        setGameHistory([]);
+        setGameHistoryError("Could not connect to the backend server.");
+      } finally {
+        setIsGameHistoryLoading(false);
+      }
+    }
+
+    loadGameHistory();
+
+    return () => controller.abort();
+  }, [username]);
 
   return (
     <>
@@ -423,10 +591,11 @@ export default function ProfilePage({
                   key={tab}
                   type="button"
                   onClick={() => setActiveTab(tab)}
-                  className={`relative px-4 py-3.5 text-sm font-bold transition ${activeTab === tab
+                  className={`relative px-4 py-3.5 text-sm font-bold transition ${
+                    activeTab === tab
                       ? "text-neutral-950"
                       : "text-neutral-500 hover:text-neutral-800"
-                    }`}
+                  }`}
                 >
                   {tab}
                   {activeTab === tab && (
@@ -463,24 +632,11 @@ export default function ProfilePage({
                   </div>
                 </section>
 
-                <section className="rounded-2xl border border-neutral-200 bg-white p-5 shadow-xl shadow-neutral-200/70">
-                  <div className="flex items-center justify-between">
-                    <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-700">
-                      Game History
-                    </h2>
-                    <span className="rounded-full bg-neutral-100 px-2.5 py-0.5 text-xs font-bold text-neutral-500">
-                      {profile.gamesPlayed.toLocaleString()} games
-                    </span>
-                  </div>
-                  <div className="mt-6 flex flex-col items-center justify-center py-10 text-center">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-neutral-100 font-mono text-xl font-bold text-neutral-400">
-                      CG
-                    </div>
-                    <p className="mt-3 text-sm font-medium text-neutral-500">
-                      No games recorded yet.
-                    </p>
-                  </div>
-                </section>
+                <GameHistorySection
+                  games={gameHistory}
+                  isLoading={isGameHistoryLoading}
+                  errorMessage={gameHistoryError}
+                />
               </div>
 
               <div className="flex flex-col gap-4">
@@ -525,10 +681,12 @@ export default function ProfilePage({
           )}
 
           {profile && activeTab === "Games" && (
-            <div className="mt-4 rounded-2xl border border-neutral-200 bg-white p-8 text-center shadow-xl shadow-neutral-200/70">
-              <p className="text-sm font-medium text-neutral-500">
-                Games tab - No completed games to display yet.
-              </p>
+            <div className="mt-4">
+              <GameHistorySection
+                games={gameHistory}
+                isLoading={isGameHistoryLoading}
+                errorMessage={gameHistoryError}
+              />
             </div>
           )}
         </div>
