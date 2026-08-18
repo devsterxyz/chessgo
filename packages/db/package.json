@@ -4,10 +4,11 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./user.db.ts",
-    "./game": "./game.db.ts"
+    ".": "./user.db.js",
+    "./game": "./game.db.js"
   },
   "scripts": {
+    "build": "tsc",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
