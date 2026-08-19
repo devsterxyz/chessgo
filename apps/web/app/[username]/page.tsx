@@ -1,6 +1,8 @@
 "use client";
 
 import { use, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { closeGameSocket } from "../lib/gameSocket";
 import { Navbar } from "../Navbar";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3002";
@@ -176,10 +178,12 @@ function GameHistorySection({
   games,
   isLoading,
   errorMessage,
+  currentUser,
 }: {
   games: GameHistoryItem[];
   isLoading: boolean;
   errorMessage: string;
+  currentUser?: string | null;
 }) {
   return (
     <section className="rounded-2xl border border-neutral-200 bg-white p-5 shadow-xl shadow-neutral-200/70">
@@ -214,9 +218,9 @@ function GameHistorySection({
         </div>
       ) : (
         <div className="mt-5 overflow-hidden rounded-xl border border-neutral-100">
-          <div className="hidden grid-cols-[minmax(220px,1fr)_180px_90px_140px] bg-neutral-50 px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-neutral-500 md:grid">
+          <div className="hidden grid-cols-[minmax(220px,1fr)_120px_90px_140px] bg-neutral-50 px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-neutral-500 md:grid">
             <span>Players</span>
-            <span>Winner</span>
+            <span>Result</span>
             <span className="text-right">Moves</span>
             <span className="text-right">Date</span>
           </div>
@@ -228,20 +232,51 @@ function GameHistorySection({
                 className="grid gap-3 px-4 py-3 text-sm md:grid-cols-[minmax(220px,1fr)_180px_90px_140px] md:items-center"
               >
                 <div className="flex min-w-0 flex-col gap-1">
-                  <span className="truncate font-bold text-neutral-950">
-                    {game.whiteUsername}
+                  <span className="truncate font-bold text-neutral-950 flex items-center gap-2">
+                    <span
+                      aria-hidden
+                      className="inline-block w-3 h-3 border border-neutral-300 bg-white"
+                    />
+                    <span className="truncate">{game.whiteUsername}</span>
                   </span>
-                  <span className="truncate font-bold text-neutral-600">
-                    {game.blackUsername}
+                  <span className="truncate font-bold text-neutral-600 flex items-center gap-2">
+                    <span
+                      aria-hidden
+                      className="inline-block w-3 h-3 bg-neutral-950"
+                    />
+                    <span className="truncate">{game.blackUsername}</span>
                   </span>
                 </div>
 
                 <div className="flex items-center justify-between gap-2 md:block">
                   <span className="text-xs font-bold uppercase tracking-wider text-neutral-400 md:hidden">
-                    Winner
+                    Result
                   </span>
-                  <span className="font-bold text-emerald-700">
-                    {game.winnerUsername ?? "Draw"}
+                  <span className="md:text-left md:font-bold">
+                    {(() => {
+                      const me = currentUser ?? null;
+                      if (!game.winnerUsername) {
+                        return (
+                          <span className="inline-flex items-center justify-center rounded px-2 py-0.5 text-sm font-bold text-neutral-700 bg-neutral-200">
+                            ½
+                          </span>
+                        );
+                      }
+
+                      if (me && game.winnerUsername === me) {
+                        return (
+                          <span className="inline-flex items-center justify-center rounded px-2 py-0.5 text-sm font-bold text-white bg-emerald-600">
+                            +
+                          </span>
+                        );
+                      }
+
+                      return (
+                        <span className="inline-flex items-center justify-center rounded px-2 py-0.5 text-sm font-bold text-white bg-red-600">
+                          -
+                        </span>
+                      );
+                    })()}
                   </span>
                 </div>
 
@@ -327,6 +362,7 @@ export default function ProfilePage({
   const [isGameHistoryLoading, setIsGameHistoryLoading] = useState(true);
   const displayName = profile?.username ?? username;
   const initials = useMemo(() => getInitials(displayName), [displayName]);
+  const router = useRouter();
 
   function startEditingBio() {
     if (!profile) return;
@@ -369,6 +405,19 @@ export default function ProfilePage({
         body: JSON.stringify({ bio: nextBio }),
       });
       const data = (await response.json()) as ProfileResponse;
+
+      if (
+        response.status === 401 ||
+        (data && /token expired/i.test(String(data.message ?? "")))
+      ) {
+        closeGameSocket();
+        localStorage.removeItem("chessgo_user");
+        localStorage.removeItem("chessgo_access_token");
+        localStorage.removeItem("chessgo_refresh_token");
+        setBioError("Session expired. Please sign in again.");
+        router.replace("/");
+        return;
+      }
 
       if (!response.ok || !data.user) {
         setBioError(data.message ?? "Unable to update your bio.");
@@ -420,6 +469,20 @@ export default function ProfilePage({
         });
         const data = (await response.json()) as ProfileResponse;
 
+        if (
+          response.status === 401 ||
+          (data && /token expired/i.test(String(data.message ?? "")))
+        ) {
+          closeGameSocket();
+          localStorage.removeItem("chessgo_user");
+          localStorage.removeItem("chessgo_access_token");
+          localStorage.removeItem("chessgo_refresh_token");
+          setProfile(null);
+          setErrorMessage("Session expired. Please sign in again.");
+          router.replace("/");
+          return;
+        }
+
         if (!response.ok || !data.user) {
           setProfile(null);
           setErrorMessage(data.message ?? "Unable to load your profile.");
@@ -457,6 +520,19 @@ export default function ProfilePage({
           { signal: controller.signal },
         );
         const data = (await response.json()) as GameHistoryResponse;
+
+        if (
+          response.status === 401 ||
+          (data && /token expired/i.test(String(data.message ?? "")))
+        ) {
+          closeGameSocket();
+          localStorage.removeItem("chessgo_user");
+          localStorage.removeItem("chessgo_access_token");
+          localStorage.removeItem("chessgo_refresh_token");
+          setGameHistory([]);
+          setGameHistoryError("Session expired. Please sign in again.");
+          return;
+        }
 
         if (!response.ok || !data.games) {
           setGameHistory([]);
@@ -636,6 +712,7 @@ export default function ProfilePage({
                   games={gameHistory}
                   isLoading={isGameHistoryLoading}
                   errorMessage={gameHistoryError}
+                  currentUser={displayName}
                 />
               </div>
 
@@ -686,6 +763,7 @@ export default function ProfilePage({
                 games={gameHistory}
                 isLoading={isGameHistoryLoading}
                 errorMessage={gameHistoryError}
+                currentUser={displayName}
               />
             </div>
           )}
