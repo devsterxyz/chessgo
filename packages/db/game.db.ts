@@ -1,4 +1,4 @@
-import { client } from "./user.db.ts"
+import { client } from "./user.db.js"
 
 export type CreateGameInput = {
   whitePlayerId: string

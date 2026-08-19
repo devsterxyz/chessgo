@@ -4,8 +4,9 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./user.db.js",
-    "./game": "./game.db.js"
+    ".": "./dist/user.db.js",
+    "./game": "./dist/game.db.js",
+    "./*": "./dist/*.js"
   },
   "scripts": {
     "build": "tsc",
