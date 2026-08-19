@@ -28,5 +28,6 @@ jobs:
             git reset --hard origin/main
             npm install
             npm run build
+            cp packages/db/.env packages/db/dist/.env
             pm2 restart all
             pm2 save
