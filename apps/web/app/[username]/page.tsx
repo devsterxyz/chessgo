@@ -7,18 +7,13 @@ import { Navbar } from "../Navbar";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3002";
 
-type Rating = {
-  rating: number;
-  delta: number;
-  sparkline: number[];
-};
-
 type UserProfile = {
   id: string;
   username: string;
   bio: string;
   joinedDate: string;
-  rating: Rating;
+  wins: number;
+  losses: number;
   gamesPlayed: number;
 };
 
@@ -31,17 +26,12 @@ type GameHistoryItem = {
   date: string | Date;
 };
 
-type ApiRating = {
-  rating: number;
-  delta: number;
-  sparkline: number[];
-};
-
 type ApiUserProfile = {
   id: string | number;
   username: string;
   bio?: string | null;
-  rating?: number | ApiRating | null;
+  wins?: number | null;
+  losses?: number | null;
   gamesPlayed?: number | null;
   createAt?: string | Date | null;
   createdAt?: string | Date | null;
@@ -78,34 +68,6 @@ function formatJoinedDate(createdAt?: string | Date | null) {
   }).format(date);
 }
 
-function extractRating(rating?: number | ApiRating | null): Rating {
-  if (rating == null) {
-    return {
-      rating: 800,
-      delta: 0,
-      sparkline: Array.from({ length: 8 }, () => 800),
-    };
-  }
-
-  if (typeof rating === "number") {
-    return {
-      rating,
-      delta: 0,
-      sparkline: Array.from({ length: 8 }, () => rating),
-    };
-  }
-
-  const value = rating.rating ?? 800;
-  return {
-    rating: value,
-    delta: rating.delta ?? 0,
-    sparkline:
-      rating.sparkline?.length >= 2
-        ? rating.sparkline
-        : Array.from({ length: 8 }, () => value),
-  };
-}
-
 function toProfile(user: ApiUserProfile): UserProfile {
   return {
     id: String(user.id),
@@ -113,7 +75,8 @@ function toProfile(user: ApiUserProfile): UserProfile {
     bio: user.bio?.trim() || "No bio yet.",
     joinedDate:
       user.joinedDate || formatJoinedDate(user.createdAt ?? user.createAt),
-    rating: extractRating(user.rating),
+    wins: user.wins ?? 0,
+    losses: user.losses ?? 0,
     gamesPlayed: user.gamesPlayed ?? 0,
   };
 }
@@ -136,43 +99,7 @@ function formatGameDate(value: string | Date) {
   }).format(date);
 }
 
-function Sparkline({ data, color }: { data: number[]; color: string }) {
-  if (data.length < 2) {
-    return <div className="h-9 rounded bg-neutral-100" />;
-  }
 
-  const min = Math.min(...data);
-  const max = Math.max(...data);
-  const range = max - min || 1;
-  const height = 36;
-  const width = 140;
-  const step = width / (data.length - 1);
-
-  const points = data
-    .map((v, i) => {
-      const x = i * step;
-      const y = height - ((v - min) / range) * (height - 6) - 3;
-      return `${x},${y}`;
-    })
-    .join(" ");
-
-  return (
-    <svg
-      viewBox={`0 0 ${width} ${height}`}
-      className="h-9 w-full"
-      preserveAspectRatio="none"
-    >
-      <polyline
-        points={points}
-        fill="none"
-        stroke={color}
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
 
 function GameHistorySection({
   games,
@@ -218,7 +145,7 @@ function GameHistorySection({
         </div>
       ) : (
         <div className="mt-5 overflow-hidden rounded-xl border border-neutral-100">
-          <div className="hidden grid-cols-[minmax(220px,1fr)_120px_90px_140px] bg-neutral-50 px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-neutral-500 md:grid">
+          <div className="hidden gap-3 bg-neutral-50 px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-neutral-500 md:grid md:grid-cols-[minmax(220px,1fr)_120px_90px_140px]">
             <span>Players</span>
             <span>Result</span>
             <span className="text-right">Moves</span>
@@ -229,7 +156,7 @@ function GameHistorySection({
             {games.map((game) => (
               <div
                 key={game.id}
-                className="grid gap-3 px-4 py-3 text-sm md:grid-cols-[minmax(220px,1fr)_180px_90px_140px] md:items-center"
+                className="grid gap-3 px-4 py-3 text-sm md:grid-cols-[minmax(220px,1fr)_120px_90px_140px] md:items-center"
               >
                 <div className="flex min-w-0 flex-col gap-1">
                   <span className="truncate font-bold text-neutral-950 flex items-center gap-2">
@@ -306,36 +233,36 @@ function GameHistorySection({
   );
 }
 
-function RatingCard({ rating }: { rating: Rating }) {
-  const isPositive = rating.delta > 0;
-  const isNegative = rating.delta < 0;
-  const sparkColor = isNegative
-    ? "#ef4444"
-    : isPositive
-      ? "#10b981"
-      : "#a3a3a3";
+function PerformanceStats({ wins, losses, gamesPlayed }: { wins: number; losses: number; gamesPlayed: number }) {
+  const winRate = gamesPlayed > 0 ? Math.round((wins / gamesPlayed) * 100) : 0;
 
   return (
-    <div className="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm transition hover:border-emerald-300">
-      <div className="flex items-center justify-between">
+    <div className="grid grid-cols-3 gap-3">
+      <div className="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
         <span className="text-xs font-bold uppercase tracking-wider text-neutral-500">
-          Rating
+          Wins
         </span>
-        {rating.delta !== 0 && (
-          <span
-            className={`text-xs font-bold ${isPositive ? "text-emerald-600" : "text-red-500"}`}
-          >
-            {isPositive ? "↑" : "↓"} {Math.abs(rating.delta)}
-          </span>
-        )}
+        <p className="mt-2 text-3xl font-extrabold tabular-nums text-emerald-600">
+          {wins}
+        </p>
       </div>
 
-      <p className="mt-2 text-3xl font-extrabold tabular-nums text-neutral-950">
-        {rating.rating}
-      </p>
+      <div className="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
+        <span className="text-xs font-bold uppercase tracking-wider text-neutral-500">
+          Losses
+        </span>
+        <p className="mt-2 text-3xl font-extrabold tabular-nums text-red-600">
+          {losses}
+        </p>
+      </div>
 
-      <div className="mt-3">
-        <Sparkline data={rating.sparkline} color={sparkColor} />
+      <div className="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
+        <span className="text-xs font-bold uppercase tracking-wider text-neutral-500">
+          Win Rate
+        </span>
+        <p className="mt-2 text-3xl font-extrabold tabular-nums text-neutral-950">
+          {winRate}%
+        </p>
       </div>
     </div>
   );
@@ -640,10 +567,22 @@ export default function ProfilePage({
                           Joined
                         </span>
                         <span>
-                          <strong className="font-semibold text-neutral-700">
-                            {profile.rating.rating}
+                          <strong className="font-semibold text-emerald-700">
+                            {profile.wins}
                           </strong>{" "}
-                          Rating
+                          Wins
+                        </span>
+                        <span>
+                          <strong className="font-semibold text-red-700">
+                            {profile.losses}
+                          </strong>{" "}
+                          Losses
+                        </span>
+                        <span>
+                          <strong className="font-semibold text-neutral-700">
+                            {profile.gamesPlayed}
+                          </strong>{" "}
+                          Games
                         </span>
                       </div>
                     ) : null}
@@ -701,10 +640,14 @@ export default function ProfilePage({
               <div className="flex flex-col gap-4">
                 <section className="rounded-2xl border border-neutral-200 bg-white p-5 shadow-xl shadow-neutral-200/70">
                   <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-700">
-                    Rating
+                    Performance
                   </h2>
                   <div className="mt-4">
-                    <RatingCard rating={profile.rating} />
+                    <PerformanceStats
+                      wins={profile.wins}
+                      losses={profile.losses}
+                      gamesPlayed={profile.gamesPlayed}
+                    />
                   </div>
                 </section>
 
@@ -719,11 +662,28 @@ export default function ProfilePage({
               <div className="flex flex-col gap-4">
                 <section className="rounded-2xl border border-neutral-200 bg-white p-5 shadow-xl shadow-neutral-200/70">
                   <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-700">
-                    Current Rating
+                    Record Overview
                   </h2>
-                  <p className="mt-3 text-3xl font-extrabold tabular-nums text-neutral-950">
-                    {profile.rating.rating}
-                  </p>
+                  <div className="mt-3 flex items-center justify-between">
+                    <div>
+                      <p className="text-2xl font-extrabold tabular-nums text-emerald-600">
+                        {profile.wins} W
+                      </p>
+                      <p className="text-xs text-neutral-500">Wins</p>
+                    </div>
+                    <div>
+                      <p className="text-2xl font-extrabold tabular-nums text-red-600">
+                        {profile.losses} L
+                      </p>
+                      <p className="text-xs text-neutral-500">Losses</p>
+                    </div>
+                    <div>
+                      <p className="text-2xl font-extrabold tabular-nums text-neutral-950">
+                        {profile.gamesPlayed}
+                      </p>
+                      <p className="text-xs text-neutral-500">Total Games</p>
+                    </div>
+                  </div>
                 </section>
 
                 <section className="rounded-2xl border border-neutral-200 bg-white p-5 shadow-xl shadow-neutral-200/70">
@@ -746,9 +706,16 @@ export default function ProfilePage({
                     </div>
                     <div className="h-px bg-neutral-100" />
                     <div className="flex justify-between">
-                      <dt className="text-neutral-500">Rating</dt>
-                      <dd className="font-bold text-neutral-950">
-                        {profile.rating.rating}
+                      <dt className="text-neutral-500">Wins</dt>
+                      <dd className="font-bold text-emerald-600">
+                        {profile.wins}
+                      </dd>
+                    </div>
+                    <div className="h-px bg-neutral-100" />
+                    <div className="flex justify-between">
+                      <dt className="text-neutral-500">Losses</dt>
+                      <dd className="font-bold text-red-600">
+                        {profile.losses}
                       </dd>
                     </div>
                   </dl>

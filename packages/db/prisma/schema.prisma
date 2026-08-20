@@ -18,7 +18,8 @@ model User {
   bio       String?
   avatarUrl String?
 
-  rating      Int @default(800)
+  wins        Int @default(0)
+  losses      Int @default(0)
   gamesPlayed Int @default(0)
 }
 

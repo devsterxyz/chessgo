@@ -40,7 +40,8 @@ export const createUser = (data: CreateUserInput) => {
       username: true,
       bio: true,
       avatarUrl: true,
-      rating: true,
+      wins: true,
+      losses: true,
       gamesPlayed: true,
       createdAt: true
     }
@@ -68,7 +69,8 @@ export const updateRefreshToken = (id: number, refreshToken: string) => {
       username: true,
       bio: true,
       avatarUrl: true,
-      rating: true,
+      wins: true,
+      losses: true,
       gamesPlayed: true,
       createdAt: true
     }
@@ -83,7 +85,8 @@ export const findUserByUserId = (id: number) => {
       username: true,
       bio: true,
       avatarUrl: true,
-      rating: true,
+      wins: true,
+      losses: true,
       gamesPlayed: true,
       createdAt: true
     }
@@ -106,7 +109,8 @@ export const updateUserProfile = (id: number,
       username: true,
       bio: true,
       avatarUrl: true,
-      rating: true,
+      wins: true,
+      losses: true,
       gamesPlayed: true,
       createdAt: true
     }

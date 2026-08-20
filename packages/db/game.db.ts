@@ -28,7 +28,7 @@ export const createGame = (data: CreateGameInput) => {
   })
 }
 
-export const finishGame = (
+export const finishGame = async (
   gameId: string,
   opts?: {
     winnerId?: string | null
@@ -36,7 +36,12 @@ export const finishGame = (
     moves?: number
   },
 ) => {
-  return client.game.update({
+  const existingGame = await client.game.findUnique({
+    where: { id: gameId },
+    select: { whitePlayerId: true, blackPlayerId: true, status: true },
+  })
+
+  const updatedGame = await client.game.update({
     where: { id: gameId },
     data: {
       winnerId: opts?.winnerId ?? null,
@@ -45,6 +50,46 @@ export const finishGame = (
       endedAt: new Date(),
     },
   })
+
+  if (existingGame && existingGame.status === "PLAYING") {
+    const whiteId = Number(existingGame.whitePlayerId)
+    const blackId = Number(existingGame.blackPlayerId)
+    const winnerIdNum = opts?.winnerId ? Number(opts.winnerId) : null
+
+    if (Number.isInteger(whiteId)) {
+      await client.user
+        .update({
+          where: { id: whiteId },
+          data: {
+            gamesPlayed: { increment: 1 },
+            ...(winnerIdNum === whiteId
+              ? { wins: { increment: 1 } }
+              : winnerIdNum
+                ? { losses: { increment: 1 } }
+                : {}),
+          },
+        })
+        .catch(() => {})
+    }
+
+    if (Number.isInteger(blackId)) {
+      await client.user
+        .update({
+          where: { id: blackId },
+          data: {
+            gamesPlayed: { increment: 1 },
+            ...(winnerIdNum === blackId
+              ? { wins: { increment: 1 } }
+              : winnerIdNum
+                ? { losses: { increment: 1 } }
+                : {}),
+          },
+        })
+        .catch(() => {})
+    }
+  }
+
+  return updatedGame
 }
 
 export const setGameStatus = (gameId: string, status: "PLAYING" | "FINISHED" | "ABANDONED") => {

@@ -15,24 +15,20 @@ type UserResponseInput = {
   username: string;
   bio?: string | null;
   avatarUrl?: string | null;
-  rating?: number | null;
+  wins?: number | null;
+  losses?: number | null;
   gamesPlayed?: number | null;
   createdAt: Date;
 };
 
 const toSafeUser = (user: UserResponseInput) => {
-  const numericRating = user.rating ?? 800;
-
   return {
     id: user.id,
     username: user.username,
     bio: user.bio ?? "No bio yet.",
     avatarUrl: user.avatarUrl ?? "/default-avatar.png",
-    rating: {
-      rating: numericRating,
-      delta: 0,
-      sparkline: Array(8).fill(numericRating),
-    },
+    wins: user.wins ?? 0,
+    losses: user.losses ?? 0,
     gamesPlayed: user.gamesPlayed ?? 0,
     joinedDate: user.createdAt
       ? new Date(user.createdAt).toLocaleDateString("en-US", {

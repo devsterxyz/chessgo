@@ -21,7 +21,8 @@ type StoredUser = {
 type ProfileInfo = {
   username: string;
   bio: string;
-  rating: number;
+  wins: number;
+  losses: number;
   gamesPlayed: number;
   joinedDate: string;
 };
@@ -88,13 +89,12 @@ export function Navbar() {
       }
 
       const user = data.user;
-      const ratingValue =
-        typeof user.rating === "object" ? user.rating?.rating : user.rating;
 
       setProfileInfo({
         username: user.username ?? username,
         bio: user.bio ?? "No bio yet.",
-        rating: ratingValue ?? 800,
+        wins: user.wins ?? 0,
+        losses: user.losses ?? 0,
         gamesPlayed: user.gamesPlayed ?? 0,
         joinedDate:
           user.joinedDate ??
@@ -207,11 +207,19 @@ export function Navbar() {
               {profileInfo && !isLoadingProfile ? (
                 <div className="grid grid-cols-3 divide-x divide-neutral-100 border-b border-neutral-100">
                   <div className="px-3 py-3 text-center">
-                    <p className="text-lg font-extrabold tabular-nums text-neutral-950">
-                      {profileInfo.rating}
+                    <p className="text-lg font-extrabold tabular-nums text-emerald-600">
+                      {profileInfo.wins}
                     </p>
                     <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">
-                      Rating
+                      Wins
+                    </p>
+                  </div>
+                  <div className="px-3 py-3 text-center">
+                    <p className="text-lg font-extrabold tabular-nums text-red-600">
+                      {profileInfo.losses}
+                    </p>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">
+                      Losses
                     </p>
                   </div>
                   <div className="px-3 py-3 text-center">
@@ -220,14 +228,6 @@ export function Navbar() {
                     </p>
                     <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">
                       Games
-                    </p>
-                  </div>
-                  <div className="px-3 py-3 text-center">
-                    <p className="text-[11px] font-bold text-neutral-950">
-                      {profileInfo.joinedDate}
-                    </p>
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">
-                      Joined
                     </p>
                   </div>
                 </div>

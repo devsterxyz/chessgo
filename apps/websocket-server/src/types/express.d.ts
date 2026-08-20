@@ -5,7 +5,8 @@ declare global {
       username: string;
       bio: string | null;
       avatarUrl: string | null;
-      rating: number;
+      wins: number;
+      losses: number;
       gamesPlayed: number;
       createdAt: Date;
     }
