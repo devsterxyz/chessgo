@@ -27,6 +27,13 @@ type ProfileInfo = {
   joinedDate: string;
 };
 
+type SearchUser = {
+  id: number;
+  username: string;
+  bio?: string | null;
+  gamesPlayed?: number | null;
+};
+
 function subscribeToStoredUser(onStoreChange: () => void) {
   window.addEventListener("storage", onStoreChange);
   return () => window.removeEventListener("storage", onStoreChange);
@@ -54,6 +61,7 @@ function getInitials(name: string) {
 export function Navbar() {
   const router = useRouter();
   const menuRef = useRef<HTMLDivElement | null>(null);
+  const searchRef = useRef<HTMLDivElement | null>(null);
   const username = useSyncExternalStore(
     subscribeToStoredUser,
     getStoredUsername,
@@ -64,6 +72,10 @@ export function Navbar() {
   const [isLoadingProfile, setIsLoadingProfile] = useState(false);
   const [profileError, setProfileError] = useState("");
   const hasFetchedRef = useRef(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<SearchUser[]>([]);
+  const [isSearchLoading, setIsSearchLoading] = useState(false);
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
 
   const fetchProfile = useCallback(async () => {
     if (hasFetchedRef.current && profileInfo) return;
@@ -125,11 +137,42 @@ export function Navbar() {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
         setIsProfileOpen(false);
       }
+      if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
+        setIsSearchFocused(false);
+      }
     };
 
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    const trimmed = searchQuery.trim();
+    if (trimmed.length < 2) {
+      setSearchResults([]);
+      return;
+    }
+
+    setIsSearchLoading(true);
+    const timeout = setTimeout(async () => {
+      try {
+        const res = await fetch(
+          `${API_BASE_URL}/profile/search?q=${encodeURIComponent(trimmed)}`,
+        );
+        const data = (await res.json()) as { users?: SearchUser[] };
+        setSearchResults(data.users ?? []);
+      } catch {
+        setSearchResults([]);
+      } finally {
+        setIsSearchLoading(false);
+      }
+    }, 300);
+
+    return () => {
+      clearTimeout(timeout);
+      setIsSearchLoading(false);
+    };
+  }, [searchQuery]);
 
   const handleLogout = () => {
     closeGameSocket();
@@ -147,10 +190,97 @@ export function Navbar() {
 
   return (
     <nav className="border-b border-neutral-200 bg-white px-4 text-neutral-950 shadow-sm shadow-neutral-200/60">
-      <div className="mx-auto flex h-16 max-w-[1180px] items-center justify-between">
+      <div className="mx-auto flex h-16 max-w-[1180px] items-center justify-between gap-3">
         <Link href="/play" onClick={closeGameSocket}>
           <h1 className="text-xl font-extrabold">ChessGo</h1>
         </Link>
+
+        {/* Player search */}
+        <div ref={searchRef} className="relative hidden w-full max-w-xs sm:block">
+          <div className="relative flex items-center">
+            <svg
+              className="pointer-events-none absolute left-3 h-3.5 w-3.5 text-neutral-400"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+              strokeWidth={2.5}
+              stroke="currentColor"
+              aria-hidden
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="m21 21-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0Z"
+              />
+            </svg>
+            <input
+              id="player-search"
+              type="text"
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setIsSearchFocused(true);
+              }}
+              onFocus={() => setIsSearchFocused(true)}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") {
+                  setSearchQuery("");
+                  setIsSearchFocused(false);
+                }
+              }}
+              autoComplete="off"
+              placeholder="Search players…"
+              className="h-9 w-full rounded-lg border border-neutral-200 bg-neutral-50 pl-8 pr-3 text-sm text-neutral-800 outline-none transition placeholder:text-neutral-400 focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-100"
+            />
+          </div>
+
+          {isSearchFocused && searchQuery.trim().length >= 2 && (
+            <div
+              className="absolute left-0 right-0 top-full z-30 mt-1.5 overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-xl shadow-neutral-200/70"
+              style={{ animation: "navDropdownIn 0.12s ease-out" }}
+            >
+              {isSearchLoading ? (
+                <p className="px-4 py-3 text-sm text-neutral-400">Searching…</p>
+              ) : searchResults.length === 0 ? (
+                <p className="px-4 py-3 text-sm text-neutral-500">
+                  No player found for{" "}
+                  <span className="font-bold text-neutral-800">
+                    &ldquo;{searchQuery.trim()}&rdquo;
+                  </span>
+                </p>
+              ) : (
+                <ul role="listbox">
+                  {searchResults.map((user) => (
+                    <li key={user.id} role="option" aria-selected={false}>
+                      <Link
+                        href={`/${user.username}`}
+                        onClick={() => {
+                          setSearchQuery("");
+                          setIsSearchFocused(false);
+                        }}
+                        className="flex items-center gap-3 px-4 py-2.5 transition hover:bg-emerald-50"
+                      >
+                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-neutral-950 text-[10px] font-extrabold text-white">
+                          {user.username.slice(0, 2).toUpperCase()}
+                        </span>
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-bold text-neutral-950">
+                            {user.username}
+                          </p>
+                          {user.gamesPlayed ? (
+                            <p className="text-xs text-neutral-400">
+                              {user.gamesPlayed} games
+                            </p>
+                          ) : null}
+                        </div>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+        </div>
 
         <div ref={menuRef} className="relative">
           <button

@@ -5,6 +5,7 @@
   "type": "module",
   "exports": {
     ".": "./dist/user.db.js",
+    "./user": "./dist/user.db.js",
     "./game": "./dist/game.db.js",
     "./*": "./dist/*.js"
   },

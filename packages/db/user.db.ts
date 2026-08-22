@@ -94,6 +94,22 @@ export const findUserByUserId = (id: number) => {
 }
 
 
+export const getPublicUserByUsername = (username: string) => {
+  return client.user.findUnique({
+    where: { username },
+    select: {
+      id: true,
+      username: true,
+      bio: true,
+      avatarUrl: true,
+      wins: true,
+      losses: true,
+      gamesPlayed: true,
+      createdAt: true
+    }
+  })
+}
+
 export const updateUserProfile = (id: number,
     data: {
       username?: string
@@ -114,5 +130,24 @@ export const updateUserProfile = (id: number,
       gamesPlayed: true,
       createdAt: true
     }
+  })
+}
+
+export const searchUsersByUsername = (query: string, limit = 5) => {
+  return client.user.findMany({
+    where: {
+      username: {
+        contains: query,
+        mode: 'insensitive',
+      },
+    },
+    select: {
+      id: true,
+      username: true,
+      bio: true,
+      gamesPlayed: true,
+    },
+    take: limit,
+    orderBy: { username: 'asc' },
   })
 }

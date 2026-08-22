@@ -43,6 +43,27 @@ type ProfileResponse = {
   user?: ApiUserProfile;
 };
 
+// Shape returned by the public GET /profile/:username endpoint
+type ApiPublicProfile = {
+  id: string | number;
+  username: string;
+  bio?: string | null;
+  avatarUrl?: string | null;
+  stats?: {
+    wins?: number | null;
+    losses?: number | null;
+    gamesPlayed?: number | null;
+    winRate?: number | null;
+  } | null;
+  joinedDate?: string | null;
+  createdAt?: string | Date | null;
+};
+
+type PublicProfileResponse = {
+  message?: string;
+  profile?: ApiPublicProfile;
+};
+
 type GameHistoryResponse = {
   message?: string;
   games?: GameHistoryItem[];
@@ -78,6 +99,19 @@ function toProfile(user: ApiUserProfile): UserProfile {
     wins: user.wins ?? 0,
     losses: user.losses ?? 0,
     gamesPlayed: user.gamesPlayed ?? 0,
+  };
+}
+
+// Maps the public /profile/:username response shape
+function toPublicProfile(p: ApiPublicProfile): UserProfile {
+  return {
+    id: String(p.id),
+    username: p.username,
+    bio: p.bio?.trim() || "No bio yet.",
+    joinedDate: p.joinedDate || formatJoinedDate(p.createdAt),
+    wins: p.stats?.wins ?? 0,
+    losses: p.stats?.losses ?? 0,
+    gamesPlayed: p.stats?.gamesPlayed ?? 0,
   };
 }
 
@@ -291,6 +325,25 @@ export default function ProfilePage({
   const initials = useMemo(() => getInitials(displayName), [displayName]);
   const router = useRouter();
 
+  // Determine whether the viewer is looking at their own profile.
+  // Always start null so SSR and initial client render agree (no hydration mismatch).
+  const [loggedInUsername, setLoggedInUsername] = useState<string | null>(null);
+  const isOwnProfile = Boolean(
+    loggedInUsername &&
+      username.toLowerCase() === loggedInUsername.toLowerCase(),
+  );
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem("chessgo_user");
+      if (!stored) return;
+      const parsed = JSON.parse(stored) as { username?: string };
+      setLoggedInUsername(parsed.username?.trim() ?? null);
+    } catch {
+      // ignore malformed data
+    }
+  }, []);
+
   function startEditingBio() {
     if (!profile) return;
 
@@ -378,50 +431,29 @@ export default function ProfilePage({
       setIsLoading(true);
       setErrorMessage("");
 
-      const token = localStorage.getItem("chessgo_access_token");
-
-      if (!token) {
-        setProfile(null);
-        setErrorMessage("Sign in to view your profile.");
-        setIsLoading(false);
-        return;
-      }
-
       try {
-        const response = await fetch(`${API_BASE_URL}/user/getProfile`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-          signal: controller.signal,
-        });
-        const data = (await response.json()) as ProfileResponse;
+        // Public endpoint — no auth token required. Works for any username.
+        const response = await fetch(
+          `${API_BASE_URL}/profile/${encodeURIComponent(username)}`,
+          { signal: controller.signal },
+        );
+        const data = (await response.json()) as PublicProfileResponse;
 
-        if (
-          response.status === 401 ||
-          (data && /token expired/i.test(String(data.message ?? "")))
-        ) {
-          closeGameSocket();
-          localStorage.removeItem("chessgo_user");
-          localStorage.removeItem("chessgo_access_token");
-          localStorage.removeItem("chessgo_refresh_token");
+        if (!response.ok || !data.profile) {
           setProfile(null);
-          setErrorMessage("Session expired. Please sign in again.");
-          router.replace("/");
+          setErrorMessage(
+            response.status === 404
+              ? `No user found with the username "${username}".`
+              : (data.message ?? "Unable to load profile."),
+          );
           return;
         }
 
-        if (!response.ok || !data.user) {
-          setProfile(null);
-          setErrorMessage(data.message ?? "Unable to load your profile.");
-          return;
-        }
-
-        setProfile(toProfile(data.user));
+        setProfile(toPublicProfile(data.profile));
       } catch (error) {
         if (error instanceof DOMException && error.name === "AbortError") {
           return;
         }
-
         setProfile(null);
         setErrorMessage("Could not connect to the backend server.");
       } finally {
@@ -432,7 +464,7 @@ export default function ProfilePage({
     loadProfile();
 
     return () => controller.abort();
-  }, []);
+  }, [username]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -589,14 +621,16 @@ export default function ProfilePage({
                   </div>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={startEditingBio}
-                  disabled={!profile || isEditingBio || isLoading}
-                  className="self-start rounded-lg border border-neutral-200 bg-neutral-100 px-4 py-2 text-sm font-semibold text-neutral-700 transition hover:border-neutral-300 hover:bg-neutral-200"
-                >
-                  Edit Profile
-                </button>
+                {isOwnProfile && (
+                  <button
+                    type="button"
+                    onClick={startEditingBio}
+                    disabled={!profile || isEditingBio || isLoading}
+                    className="self-start rounded-lg border border-neutral-200 bg-neutral-100 px-4 py-2 text-sm font-semibold text-neutral-700 transition hover:border-neutral-300 hover:bg-neutral-200"
+                  >
+                    Edit Profile
+                  </button>
+                )}
               </div>
             </div>
 

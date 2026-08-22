@@ -3,6 +3,7 @@ import { GameManager } from "./GameManager.js"
 import express from "express"
 import userRouter from "./routes/user.routes.js"
 import gameRouter from "./routes/game.routes.js"
+import profileRouter from "./routes/profile.routes.js"
 
 let app = express()
 const httpPort = Number(process.env.PORT ?? 3002)
@@ -38,6 +39,7 @@ app
 
 app.use("/user", userRouter)
 app.use("/game", gameRouter)
+app.use("/profile", profileRouter)
 
 const wss = new WebSocketServer({ port: websocketPort })
 const gameManager = new GameManager()
